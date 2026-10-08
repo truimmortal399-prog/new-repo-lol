@@ -90,11 +90,12 @@ def test_readout_keeps_scale_after_value_change():
     assert abs(h1 / h0 - 0.5) < 0.02
 
 
-def test_readout_label_follows_number_without_moving_it():
-    """label_follows: the decimal point never moves; the label hugs the leading digit and only
-    moves when the digit count changes."""
+def test_left_aligned_readout_has_no_gap_and_moves_only_on_digit_count_change():
+    """align='left': the number starts right after the label (no blank cells); within a digit
+    count the decimal point stays put, and the label never moves."""
     v = ValueTracker(120.0)
-    r = Readout("<i>R</i> =", v.get_value, "{:.1f}", unit="Ω", n_slots=5, label_follows=True).place([-6.3, -1.75, 0])
+    r = Readout("<i>R</i> =", v.get_value, "{:.1f}", unit="Ω", n_slots=5, align="left").place([-6.3, -1.75, 0])
+    label_x = r.label.get_left()[0]
 
     def dot_x():
         return [s.get_center()[0] for s, ch in zip(r.slots, r.text) if ch == "."][0]
@@ -103,12 +104,10 @@ def test_readout_label_follows_number_without_moving_it():
         first = next(s for s, ch in zip(r.slots, r.text) if ch.strip())
         return first.get_left()[0] - r.label.get_right()[0]
 
-    seen = []
-    for val in (120.0, 99.9, 57.3, 9.9, 4.0):
+    dots = {}
+    for val in (120.0, 110.4, 99.9, 57.3, 9.9, 4.0):
         v.set_value(val)
         r.update()
-        seen.append((dot_x(), gap()))
-    dots = [d for d, _ in seen]
-    gaps = [g for _, g in seen]
-    assert max(dots) - min(dots) < 1e-9  # the number never moves
-    assert max(gaps) < 0.2 and min(gaps) > 0.0  # label always close to the leading digit
+        assert 0.0 < gap() < 0.2 and abs(r.label.get_left()[0] - label_x) < 1e-9
+        dots.setdefault(len(f"{val:.1f}"), set()).add(round(dot_x(), 9))
+    assert all(len(xs) == 1 for xs in dots.values())  # fixed within each digit count

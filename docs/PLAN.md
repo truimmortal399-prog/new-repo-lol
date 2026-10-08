@@ -238,7 +238,26 @@ S7 61.00–76.00.
    accent decodes within 3 levels of its theme value (the old untagged-BT.601 path could shift
    accents by ~15 levels in BT.709-assuming players).
 4. Deliverables: 1080p committed if < 100 MB. 4K hand-over: this session's GitHub tools cannot
-   create releases or upload assets (read-only release tools only) — see the Gate 3 report.
+   create releases or upload assets (read-only release tools only) — see Gate 3 below.
+
+**Gate 3 measurements** (`tools/time_bench.py` on `scenes/bench_live.py`: final mesh 4704 faces,
+Bode + impulse panels, readouts, caption, monitor; lossless encode included; 4 vCPU):
+| | s/frame | setup |
+|---|---|---|
+| 1080p60 | 0.543 | 2.8 s |
+| 2160p60 | 0.614 | 5.1 s |
+| 2160p60, 3 renders in parallel | 0.72 each | — |
+Frame cost is Python-bound (Cairo path building per face), so 4K costs only +13 % per frame.
+Final encodes (measured on 4 s of bench): 4K CRF 16 ≈ 6.0 s per film second, 3.4 Mbit/s;
+1080p CRF 18 ≈ 2.2 s per film second, 1.1 Mbit/s.
+**Projection** (4560 frames at 60 fps, 4261 of them 3D, all costed at bench load): 3 parallel
+workers, longest-processing-time schedule → critical path S6 + S5 = 1517 frames × 0.72 s ≈ 18 min
+(≈ 28 min with a 1.5× margin for heavier scenes); serial would be ≈ 45 min. Plus final encodes
+≈ 8 min (4K) + 3 min (1080p). **≈ 30–40 min wall ≪ 3 h → 4K is GO.**
+Proposed: render 4K once and derive the 1080p master by a Lanczos downscale of the lossless 4K
+concat in its final encode (supersampled anti-aliasing, no second render).
+Projected file sizes (bench bitrate; real content varies): 4K ≈ 30–80 MB, 1080p ≈ 10–25 MB.
+Lossless intermediates ≈ 1.5 GB at 4K (disk has > 25 GB free).
 
 ## 12. Gates
 1. Install, LaTeX + font smoke test, test_physics.py. (done; pre-Gate-2 fixes: scene cuts moved
@@ -246,4 +265,5 @@ S7 61.00–76.00.
 2. LiveSurface, captions, theme, S3 at preview + keyframes; fixed-in-frame probe; bench_live.py.
    (done, pending approval; reviewed by a 4-lens adversarial workflow, findings fixed)
 3. 2 s timing of bench_live.py at 4K60 and 1080p60 → full estimate, 4K go/no-go.
+   (done, pending approval: 4K GO, ≈ 30–40 min projected wall; see §11)
 Remaining scenes only after Gates 2 and 3 are approved.
