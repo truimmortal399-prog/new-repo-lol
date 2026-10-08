@@ -48,6 +48,10 @@ S5_ZERO_PHASES = (
     ((46.20, 47.00), 1.0, 0.0, "LINEAR"),
 )
 
+# --- S6 (48.31-61.00): lower R ---
+S6_PANELS_IN = (48.31, 49.50)  # impulse panel + R/zeta/peak readouts (display-only opacity)
+S6_SWEEP = (49.50, 61.00)  # R = 120 * (4/120)^u, u = SWEEP(alpha) (physics.r_of_sweep)
+
 # Fixed overlays on screen (film time spans) — composition checks keep 3D content clear of them.
 FORMULA_SPAN = (11.60, 76.0)  # H(s) at the top-left anchor (S2 end onward)
 ROOTS_SPAN = (11.80, 15.80)  # "LCs^2+RCs+1 = 0 => s = ..." under the formula
@@ -59,6 +63,8 @@ PROBE_SPAN = (S4_PANEL_IN[0], 76.0)  # 'output: v_C' right of the formula, with 
 DISCLOSURE_SPAN = (37.20, 47.40)  # 'interpolated: zero moved by hand' (S5 zero beat)
 PANEL_COLUMN_FROM = S4_FLY[0]  # Bode panel flies in at 30.4: panel column reserved from here
 BODE_SPAN = (S4_FLY[0], 76.0)
+IMPULSE_SPAN = (S6_PANELS_IN[0], 76.0)
+READOUTS_SPAN = (S6_PANELS_IN[0], 76.0)
 ZERO_BEAT = (35.72, 48.31)  # S5: the sheet may carry the hand-moved zero (sigma = -15 .. 0)
 APEX_SEPARATION_FROM = S3_LIFT_START  # the two tent poles must read as two spikes from here on
 APEX_MIN_SEPARATION = 0.8  # frame units, screen x

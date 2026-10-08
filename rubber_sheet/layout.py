@@ -172,6 +172,13 @@ def _hud_box(name):
         _hud["roots"] = captions._bbox_fixed(common.roots_block(f))
         _hud["height tag"] = captions._bbox_fixed(common.height_tag(f))
         _hud["probe"] = captions._bbox_fixed(VGroup(common.probe_label("C"), common.probe_label("R")))
+        from rubber_sheet.panels import ImpulsePanel
+
+        _hud["impulse"] = captions._bbox(captions._leaf_points(ImpulsePanel(lambda: ph.R_START, th.IMPULSE_BOX), visible_only=True))
+        boxes = []
+        for R in (120.0, 99.9, 9.9, 4.0):  # widest digit counts of the sweep
+            boxes.append(captions._bbox_fixed(common.readouts(lambda R=R: R)))
+        _hud["readouts"] = (min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes))
         _hud["disclosure"] = captions._bbox_fixed(common.disclosure_tag())
         # every Bode label position from linear to log (the panel's widest extent)
         boxes = [captions._bbox(captions._leaf_points(BodePanel(lambda w: ph.mag_C(1j * w, ph.R_START), th.BODE_BOX, warp=ValueTracker(mu)), visible_only=True))
@@ -183,7 +190,7 @@ def _hud_box(name):
 def hud_boxes_at(t):
     within = lambda span: span[0] <= t <= span[1]  # noqa: E731
     spans = [("formula", bt.FORMULA_SPAN), ("roots", bt.ROOTS_SPAN), ("height tag", bt.TAG_SPAN), ("bode", bt.BODE_SPAN),
-             ("probe", bt.PROBE_SPAN), ("disclosure", bt.DISCLOSURE_SPAN)]
+             ("probe", bt.PROBE_SPAN), ("disclosure", bt.DISCLOSURE_SPAN), ("impulse", bt.IMPULSE_SPAN), ("readouts", bt.READOUTS_SPAN)]
     return [(name, _hud_box(name)) for name, span in spans if within(span)]
 
 

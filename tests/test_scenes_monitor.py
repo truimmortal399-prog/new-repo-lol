@@ -22,6 +22,7 @@ SCENES = [
     ("S3", "s03_poles_sheet", "S3PolesSheet"),
     ("S4", "s04_slice_bode", "S4SliceBode"),
     ("S5", "s05_zero_nail", "S5ZeroNail"),
+    ("S6", "s06_sweep", "S6Sweep"),
 ]
 
 

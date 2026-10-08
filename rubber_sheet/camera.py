@@ -35,6 +35,7 @@ TOP = CamState(phi=0.0, theta=-90.0, zoom=0.82, pivot=SHEET_CENTER, pan=(1.1, 0.
 S3_END = CamState(phi=58.0, theta=-50.0, zoom=0.74, pivot=SHEET_PIVOT, pan=(0.7, 0.76))
 CUT = CamState(phi=82.0, theta=0.0, zoom=0.78, pivot=SHEET_PIVOT, pan=(-3.0, -0.88))  # jw cut reads as a 2D profile
 ANALYSIS = CamState(phi=64.0, theta=-40.0, zoom=0.64, pivot=SHEET_PIVOT, pan=(-2.0, -0.1))
+ANALYSIS_DRIFT = CamState(phi=64.0, theta=-48.0, zoom=0.63, pivot=SHEET_PIVOT, pan=(-1.8, 0.0))  # end of the S6 sweep
 HERO = CamState(phi=62.0, theta=-60.0, zoom=0.76, pivot=SHEET_PIVOT, pan=(0.0, 0.8))
 
 
@@ -105,6 +106,9 @@ MOVES = [
             Frame(s=0.75, zoom=0.66, pivot=(-1.25, 0.0, 1.6), pan=(-2.05, -0.295)),
         ),
     ),
+    # slow theta drift during the R sweep: the poles' sigma motion turns a little more across the
+    # screen (0.75 deg/s peak)
+    Move("S6 drift", "S6", 49.5, 61.0, ANALYSIS, ANALYSIS_DRIFT),
 ]
 
 

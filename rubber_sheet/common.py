@@ -45,6 +45,30 @@ def disclosure_tag():
     return lines.next_to(probe_label(), DOWN, aligned_edge=LEFT, buff=0.16)
 
 
+READOUT_X = -6.3  # left edge of the R / zeta readout stack (bottom-left, above the band)
+READOUT_ROWS = (-1.75, -2.2)
+
+
+def readouts(get_R, opacity=None):
+    """'R = 120.0 Omega' and 'zeta = 0.600', left-aligned under each other (S6 onward)."""
+    from rubber_sheet.panels import Readout
+
+    return VGroup(
+        Readout("<i>R</i> =", get_R, "{:.1f}", unit="Ω", n_slots=5, align="left", opacity=opacity).place([READOUT_X, READOUT_ROWS[0], 0]),
+        Readout("<i>ζ</i> =", lambda: ph.zeta(get_R()), "{:.3f}", n_slots=5, align="left", opacity=opacity).place([READOUT_X, READOUT_ROWS[1], 0]),
+    )
+
+
+def peak_readout(get_R, bode, opacity=None):
+    """'peak 28.0 dB' in SIGNAL gold on the Bode panel's title row, right-aligned to its box:
+    the resonance peak of |H_C(jw)| from physics.resonance (0 dB when there is none)."""
+    from rubber_sheet.panels import Readout
+
+    r = Readout("peak", lambda: ph.to_db(ph.resonance(get_R())[1]), "{:.1f}", unit="dB", size=th.SIZE_SMALL, color=th.SIGNAL,
+                n_slots=5, opacity=opacity)
+    return r.place([0, bode.title.get_center()[1], 0]).align_right(bode.box[1])
+
+
 def pole_values_krad(R=ph.R_START):
     p = ph.poles(R)[1] / 1e3  # upper pole, krad/s
     return p.real, p.imag

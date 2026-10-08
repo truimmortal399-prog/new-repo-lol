@@ -13,7 +13,8 @@ from rubber_sheet import layout as L
 from rubber_sheet import physics as ph
 
 RS = [ph.R_START, ph.R_SWEEP_END, 0.0]
-HOLDS = [("TOP", 11.6, 15.0, cam.TOP), ("S3_END", 21.0, 25.4, cam.S3_END), ("CUT", 30.2, 35.72, cam.CUT), ("ANALYSIS", 39.92, 61.0, cam.ANALYSIS)]
+HOLDS = [("TOP", 11.6, 15.0, cam.TOP), ("S3_END", 21.0, 25.4, cam.S3_END), ("CUT", 30.2, 35.72, cam.CUT), ("ANALYSIS", 39.92, 49.5, cam.ANALYSIS),
+         ("ANALYSIS_DRIFT", 61.0, 61.0, cam.ANALYSIS_DRIFT)]  # S7 extends the last hold
 
 
 def zeros_at(t):
