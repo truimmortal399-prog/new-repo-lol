@@ -1,0 +1,5 @@
+# Python 3.13 venv (.venv). System deps via apt: libpango1.0-dev, texlive-latex-base,
+# texlive-latex-recommended, texlive-latex-extra, texlive-fonts-recommended, dvisvgm, ffmpeg.
+manim==0.22.0
+scipy==1.18.1
+pytest==9.1.1
