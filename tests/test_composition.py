@@ -1,83 +1,63 @@
-"""Framing: projected world content stays out of the caption band, inside title-safe, and (in
-the analysis layouts) left of the panel column — sampled along every planned camera move."""
+"""Framing along EVERY planned camera move and hold, at R = 120, 4, 0 (and the hand-moved zero
+during S5): projected floor/sheet/labels stay out of the caption band, inside title-safe, left of
+the panel column once panels exist, clear of the formula/roots/height-tag blocks, and the two
+tent-pole apexes are >= 0.8 frame units apart on screen from the lift (18.0 s) on.
+The rule set itself lives in rubber_sheet.layout.frame_violations."""
 
 import numpy as np
 import pytest
 
 from rubber_sheet import beats as bt
-from rubber_sheet import captions
-from rubber_sheet import common
 from rubber_sheet import camera as cam
 from rubber_sheet import layout as L
 from rubber_sheet import physics as ph
-from rubber_sheet import theme as th
 
-MARGIN = 0.05
-
-
-def s3_lift(t):
-    return float(th.SWEEP(min(max((t - bt.S3_LIFT_START) / bt.S3_LIFT_RUN, 0.0), 1.0)))
+RS = [ph.R_START, ph.R_SWEEP_END, 0.0]
+HOLDS = [("TOP", 11.6, 15.0, cam.TOP), ("S3_END", 21.0, 25.4, cam.S3_END), ("CUT", 30.2, 35.72, cam.CUT), ("ANALYSIS", 39.92, 61.0, cam.ANALYSIS)]
 
 
-def extent(state, lift, labels, R=ph.R_START):
-    pts = [L.floor_outline()]
-    if lift > 0:
-        pts.append(L.sheet_points(R, lift))
-    if labels:
-        pts.append(L.pole_label_points(R, lift))
-    return L.screen_extent(state, np.vstack(pts))
+def zeros_at(t):
+    return [None, -15.0, -5.0, 0.0] if bt.ZERO_BEAT[0] <= t <= bt.ZERO_BEAT[1] else [None]
 
 
-def hud_boxes(with_tag):
-    f = common.formula_HC()
-    boxes = [("formula", captions._bbox_fixed(f))]
-    if with_tag:
-        boxes.append(("height tag", captions._bbox_fixed(common.height_tag(f))))
-    return boxes
+def violations(state, t):
+    out = []
+    for R in RS:
+        # the zero beat happens at R = 120 (S5); other R values are checked without the zero
+        for z in zeros_at(t) if R == ph.R_START else [None]:
+            out += [f"t={t:.2f} R={R} zero={z}: {v}" for v in L.frame_violations(state, t, R, z)]
+    return out
 
 
-def check_hud(state, lift, R, with_tag, what, labels=False):
-    """No projected sheet point (or pole label) may fall inside a HUD block."""
-    from rubber_sheet.rig import RigCamera, apply_state
-
-    pts = [L.sheet_points(R, lift)] if lift > 0 else []
-    if labels:
-        pts.append(L.pole_label_points(R, lift))
-    if not pts:
-        return
-    c = RigCamera()
-    apply_state(c, state)
-    xy = c.screen_points(np.vstack(pts))[:, :2]
-    for name, (x0, y0, x1, y1) in hud_boxes(with_tag):
-        inside = (xy[:, 0] > x0) & (xy[:, 0] < x1) & (xy[:, 1] > y0) & (xy[:, 1] < y1)
-        assert not inside.any(), f"{what}: sheet runs into the {name}"
+@pytest.mark.parametrize("move", cam.MOVES, ids=lambda m: m.name)
+def test_every_move_is_framed(move):
+    bad = []
+    for t, state in L.states_along(move, 40):
+        bad += violations(state, t)
+    assert not bad, bad[:5]
 
 
-def check(lo, hi, what, panel_column=False):
-    assert lo[1] >= L.BAND_TOP + MARGIN, f"{what}: enters caption band (y={lo[1]:.2f})"
-    assert hi[1] <= L.SAFE_Y, f"{what}: above title-safe (y={hi[1]:.2f})"
-    assert lo[0] >= -6.4 and hi[0] <= 6.4, f"{what}: outside safe x ({lo[0]:.2f}, {hi[0]:.2f})"
-    if panel_column:
-        assert hi[0] <= th.PANEL_REGION["x0"] - MARGIN, f"{what}: runs into the panel column (x={hi[0]:.2f})"
+@pytest.mark.parametrize("name,t0,t1,state", HOLDS, ids=[h[0] for h in HOLDS])
+def test_every_hold_is_framed(name, t0, t1, state):
+    bad = []
+    for t in np.linspace(t0, t1, 8):
+        bad += violations(state, float(t))
+    assert not bad, bad[:5]
 
 
-@pytest.mark.parametrize("move", cam.moves_in("S3"), ids=lambda m: m.name)
-def test_s3_moves_framed(move):
-    for t, state in L.states_along(move, 12):
-        lift, labels = s3_lift(t), t >= bt.S3_POLE_LABELS
-        lo, hi = extent(state, lift, labels)
-        check(lo, hi, f"{move.name} t={t:.2f}")
-        check_hud(state, lift, ph.R_START, t >= bt.S3_LIFT_START, f"{move.name} t={t:.2f}", labels)
+def test_apexes_apart_from_the_lift_on():
+    """Explicit form of the rule inside frame_violations: >= 0.8 frame units in screen x."""
+    samples = [(t, s) for m in cam.MOVES for t, s in L.states_along(m, 40) if t >= bt.APEX_SEPARATION_FROM]
+    samples += [(t, s) for _, a, b, s in HOLDS for t in np.linspace(max(a, bt.APEX_SEPARATION_FROM), b, 5) if b >= bt.APEX_SEPARATION_FROM]
+    assert samples
+    for t, state in samples:
+        for R in RS:
+            tops = L._project(state, L.pole_tops(R, max(L.lift_at(t), 1e-6)))
+            assert abs(tops[0, 0] - tops[1, 0]) >= bt.APEX_MIN_SEPARATION, (t, R)
 
 
-def test_top_view_framed():
-    lo, hi = extent(cam.TOP, 0.0, False)
-    check(lo, hi, "TOP")
-
-
-@pytest.mark.parametrize("R", [ph.R_START, ph.R_SWEEP_END, 0.0])
-@pytest.mark.parametrize("name,panels", [("CUT", True), ("ANALYSIS", True), ("HERO", False)])
-def test_static_states_framed(name, panels, R):
-    lo, hi = extent(getattr(cam, name), 1.0, name == "HERO", R)
-    check(lo, hi, f"{name} R={R}", panel_column=panels)
-    check_hud(getattr(cam, name), 1.0, R, True, f"{name} R={R}", name == "HERO")
+def test_moves_are_chained_and_cover_the_holds():
+    """Holds start where a move ends (or at a scene start) with the same state."""
+    ends = {round(m.t1, 2): m.end for m in cam.MOVES}
+    for name, t0, _, state in HOLDS[1:]:
+        assert ends.get(round(t0, 2)) == state, name

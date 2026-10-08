@@ -35,8 +35,15 @@ def test_chain_is_continuous():
         assert nxt.t0 >= prev.t1
 
 
+def test_s3_is_one_combined_move():
+    (s3,) = cam.moves_in("S3")
+    assert s3.start == cam.TOP and s3.end == cam.S3_END
+    assert (s3.t0, s3.t1) == (15.0, 21.0)
+    assert round(s3.peak_speed, 2) == 13.55
+
+
 def test_s3_ends_at_phi_58_and_s4_swing_value():
-    assert cam.MOVES[1].end.phi == 58.0
+    assert cam.moves_in("S3")[-1].end.phi == 58.0
     s4 = next(m for m in cam.MOVES if m.name == "S4 swing to CUT")
     assert s4.start.phi == 58.0
     expected = math.hypot(82.0 - 58.0, 0.0 - (-50.0)) / (s4.run_time - cam.RAMP)
@@ -60,3 +67,14 @@ def test_trapezoid_rate_function(run_time):
     assert np.all(np.diff(pos) >= -1e-12)
     v = np.diff(pos) / np.diff(t)
     assert v[0] < 0.05 * v.max() and v[-1] < 0.05 * v.max()  # starts and ends at rest
+
+
+@pytest.mark.parametrize("move", cam.MOVES, ids=lambda m: m.name)
+def test_state_at_endpoints_and_framing_keyframes(move):
+    assert cam.state_at(move, 0.0) == move.start
+    end = cam.state_at(move, 1.0)
+    assert end.phi == move.end.phi and end.theta == move.end.theta
+    assert end.zoom == pytest.approx(move.end.zoom) and np.allclose(end.pan, move.end.pan)
+    for f in move.via:
+        st = cam.state_at(move, f.s)
+        assert st.zoom == pytest.approx(f.zoom) and np.allclose(st.pan, f.pan)

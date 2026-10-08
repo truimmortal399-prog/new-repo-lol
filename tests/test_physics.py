@@ -156,3 +156,9 @@ def test_zero_family_matches_freqresp(z):
     w = np.logspace(2, 6, 1500)
     _, H = signal.freqresp(signal.TransferFunction(num, den), w)
     np.testing.assert_allclose(ph.mag_zero(1j * w, R, z), np.abs(H), rtol=1e-9)
+
+
+def test_zero_family_at_R_zero_is_zero_not_nan():
+    s = np.array([0j, 1j * ph.OMEGA0, -3000.0 + 5000j])
+    m = ph.mag_zero(s, 0.0, -5e3)
+    assert not np.any(np.isnan(m)) and np.all(m == 0.0)

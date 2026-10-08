@@ -9,7 +9,7 @@ on screen without touching fixed-in-frame mobjects.
 """
 
 import numpy as np
-from manim import DEGREES, Camera, ThreeDCamera, ValueTracker
+from manim import DEGREES, Camera, ThreeDCamera, UpdateFromAlphaFunc, ValueTracker
 from manim.utils.family import extract_mobject_family_members
 
 from rubber_sheet import camera as cam
@@ -118,15 +118,12 @@ def apply_state(camera, state):
 
 
 def move_anims(camera, move):
-    """Animations for a planned camera Move (all components on the same trapezoid profile)."""
+    """One animation that drives every camera tracker from camera.state_at for a planned Move
+    (angles on the trapezoidal profile, framing along its keyframed monotone cubic)."""
     rate = cam.trapezoid(move.run_time)
-    kw = dict(run_time=move.run_time, rate_func=rate)
-    end = move.end
-    return [
-        camera.phi_tracker.animate(**kw).set_value(end.phi * DEGREES),
-        camera.theta_tracker.animate(**kw).set_value(end.theta * DEGREES),
-        camera.zoom_tracker.animate(**kw).set_value(end.zoom),
-        camera._frame_center.animate(**kw).move_to(np.array(end.pivot, dtype=float)),
-        camera.pan_x.animate(**kw).set_value(end.pan[0]),
-        camera.pan_y.animate(**kw).set_value(end.pan[1]),
-    ]
+    progress = ValueTracker(0.0)
+
+    def drive(mob, alpha):
+        apply_state(camera, cam.state_at(move, rate(alpha)))
+
+    return [UpdateFromAlphaFunc(progress, drive, run_time=move.run_time, rate_func=lambda t: t)]

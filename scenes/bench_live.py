@@ -47,7 +47,7 @@ class BenchLive(ThreeDScene):
         bode = BodePanel(lambda w: ph.mag_C(1j * w, R.get_value()), th.BODE_BOX)
         imp = ImpulsePanel(R.get_value, th.IMPULSE_BOX)
         readouts = VGroup(
-            Readout("<i>R</i> =", R.get_value, "{:.1f}", unit="Ω", n_slots=5).place([-6.3, -1.75, 0]),
+            Readout("<i>R</i> =", R.get_value, "{:.1f}", unit="Ω", n_slots=5, label_follows=True).place([-6.3, -1.75, 0]),
             Readout("<i>ζ</i> =", lambda: ph.zeta(R.get_value()), "{:.3f}", n_slots=5).place([-6.3, -2.2, 0]),
             Readout("peak", lambda: 20 * np.log10(ph.resonance(R.get_value())[1]), "{:.1f}", unit="dB", size=th.SIZE_SMALL, color=th.SIGNAL, n_slots=5)
             .place([0, bode.title.get_center()[1], 0]).align_right(bode.box[1]),

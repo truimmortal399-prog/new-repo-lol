@@ -193,8 +193,12 @@ class Readout(VGroup):
 
     GLYPHS = "0123456789.−+∞"
 
-    def __init__(self, label_markup, value_fn, fmt, unit="", size=th.SIZE_LABEL, color=th.FG, n_slots=6):
+    def __init__(self, label_markup, value_fn, fmt, unit="", size=th.SIZE_LABEL, color=th.FG, n_slots=6, label_follows=False):
         super().__init__()
+        # label_follows: the number stays put (fixed decimal point); the label sits next to the
+        # current leading digit instead of in front of blank cells. It moves only when the digit
+        # count changes (e.g. R crossing 100 and 10), never per frame.
+        self.label_follows = label_follows
         self.value_fn = value_fn
         self.fmt = fmt
         self.label = MarkupText(label_markup, font=th.FONT_BODY, font_size=size, color=color)
@@ -211,14 +215,25 @@ class Readout(VGroup):
         self.unit = Text(unit, font=th.FONT_BODY, font_size=size, color=color) if unit else VGroup()
         self.add(self.label, self.slots, self.unit)
         self.anchor = None
+        self.field_left = None
         self.text = ""
         self.refresh()
         self.add_updater(lambda m: m.refresh())
 
     def align_right(self, x):
         """Shift the whole readout so its right edge (unit, or last digit) sits at x."""
-        self.shift(np.array([x - self.get_right()[0], 0.0, 0.0]))
+        dx = x - self.get_right()[0]
+        self.shift(np.array([dx, 0.0, 0.0]))
+        if self.field_left is not None:
+            self.field_left += dx
+        self.text = ""
         self.refresh()
+        return self
+
+    def shift(self, *vectors):
+        super().shift(*vectors)
+        if getattr(self, "field_left", None) is not None and getattr(self, "label_follows", False):
+            self.field_left += float(sum(np.asarray(v, dtype=float) for v in vectors)[0])
         return self
 
     def field_width(self):
@@ -229,6 +244,7 @@ class Readout(VGroup):
     def place(self, point):
         """Put the left end of the label at `point` (digits are vertically centred on it)."""
         self.label.move_to(np.array(point, dtype=float), aligned_edge=LEFT)
+        self.field_left = None
         self.text = ""
         self.refresh()
         return self
@@ -245,6 +261,14 @@ class Readout(VGroup):
         text = raw.rjust(len(self.slots))
         # Layout follows the label wherever it is now (the readout may have been moved).
         k = self.label.height / self.label_h0
+        if self.label_follows:
+            # keep the number's right edge fixed: compute it from where the label would sit with
+            # a full field, then place the label just left of the first non-blank cell
+            if self.field_left is None:
+                self.field_left = self.label.get_right()[0] + k * 0.12
+            blanks = len(text) - len(text.lstrip())
+            lead = sum(k * (self.dot_w if ch == "." else self.slot_w) for ch in text[:blanks])
+            self.label.move_to([self.field_left + lead - k * 0.12, self.label.get_center()[1], 0.0], aligned_edge=RIGHT)
         anchor = (self.label.get_left()[0], self.label.get_center()[1], k)
         if text == self.text and anchor == self.anchor:
             return self
@@ -252,7 +276,8 @@ class Readout(VGroup):
         baseline = anchor[1] - k * self.digit_h / 2
         # Lay out from a fixed right edge, so the decimal point never moves as values change.
         widths = [k * (self.dot_w if ch == "." else self.slot_w) for ch in text]
-        right = self.label.get_right()[0] + k * 0.12 + k * self.field_width()
+        field_left = self.field_left if self.label_follows else self.label.get_right()[0] + k * 0.12
+        right = field_left + k * self.field_width()
         x = right - sum(widths)
         for slot, ch, w in zip(self.slots, text, widths):
             g = self.glyphs.get(ch)

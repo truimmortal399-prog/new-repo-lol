@@ -3,9 +3,9 @@
 Beats (film time):
   11.60  s-plane fades in under the H(s) formula (top view looks 2D)
   11.80  LCs^2+RCs+1 = 0  =>  s = -6 +/- j8 krad/s (numbers from physics); x marks fly to the plane
-  15.60  camera tilts (phi 0 -> 58, trapezoid); flat tick labels fade
+  15.00  one camera move to S3_END (phi 0 -> 58, theta -90 -> -50, 6 s); flat tick labels fade
   18.00  sheet lifts (display-only lift 0 -> 1); height tag "height = 20 log10|H| (dB)" appears
-  21.00  theta swing -90 -> -50; "pole" labels on the tent poles (21.2)
+  21.20  "pole" labels on the tent poles (the poles are apart on screen from the lift on)
 Captions C3, C4, C5 from rubber_sheet/script.py.
 
   RS_QUALITY=preview .venv/bin/manim -ql scenes/s03_poles_sheet.py S3PolesSheet
@@ -102,8 +102,9 @@ class S3PolesSheet(ThreeDScene):
         tl.at(13.60, LaggedStart(*[FadeIn(d, rate_func=th.ENTER) for d in circle], lag_ratio=0.03, run_time=1.0))
         tl.at(14.40, *[FadeOut(m, run_time=SWAP, rate_func=th.LINEAR) for m in flyers], FadeIn(sheet.crosses, run_time=SWAP, rate_func=th.LINEAR))
         tl.at(15.40, FadeOut(roots, run_time=0.4, rate_func=th.EXIT))
-        tl.at(15.60, *move_anims(rig, cam.MOVES[0]))
-        tl.at(15.60, FadeOut(VGroup(floor.ticks, floor.unit), run_time=0.8, rate_func=th.EXIT))
+        s3_move = cam.moves_in("S3")[0]
+        tl.at(s3_move.t0, *move_anims(rig, s3_move))
+        tl.at(s3_move.t0, FadeOut(VGroup(floor.ticks, floor.unit), run_time=0.8, rate_func=th.EXIT))
         tl.at(bt.S3_LIFT_START, sheet.opacity.animate(run_time=bt.S3_SHEET_FADE_RUN, rate_func=th.SWEEP).set_value(1.0))
         tl.at(bt.S3_LIFT_START, sheet.lift.animate(run_time=bt.S3_LIFT_RUN, rate_func=th.SWEEP).set_value(1.0))
         # Tent poles are in the scene from the start: their length is (ceiling + 0.3) * lift, so
@@ -112,7 +113,6 @@ class S3PolesSheet(ThreeDScene):
         # the jw floor label would be half-covered by the lifted sheet's far edge; S4 labels the
         # jw axis on the cut itself. sigma stays (it lies outside the sheet's footprint).
         tl.at(bt.S3_LIFT_START, FadeOut(labels.jw, run_time=0.6, rate_func=th.EXIT))
-        tl.at(21.00, *move_anims(rig, cam.MOVES[1]))
         tl.at(bt.S3_POLE_LABELS, FadeIn(pole_labels, run_time=0.6, rate_func=th.ENTER))
         tl.extend(track.clips())
         tl.play(self)

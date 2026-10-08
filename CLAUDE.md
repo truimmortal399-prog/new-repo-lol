@@ -16,6 +16,9 @@ Full plan: docs/PLAN.md.
 - Primary master:     `tools/render.sh final1080`  (1080p60, RS_QUALITY=final, CRF 18)
 - 4K master:          `tools/render.sh final4k` — ONLY after the Gate 3 timing test projects < 3 h wall.
   Otherwise 1440p60 (`-qp`) or a Lanczos upscale of the 1080p master.
+- Encode path (docs/PLAN.md §11): scenes render LOSSLESS RGB (manim.cfg: libx264rgb, qp 0) →
+  stream-copy concat → ONE final encode RGB → BT.709 4:2:0 tagged bt709. Never pass
+  `--encoder-option` / `--config_file` (they replace manim.cfg's encoder table).
 
 ## Gates (execution is gated)
 Stop and report at each gate. Never start S1/S2/S4–S7 before Gates 2 and 3 are approved.
@@ -67,7 +70,11 @@ Stop and report at each gate. Never start S1/S2/S4–S7 before Gates 2 and 3 are
   (lift, opacity, right_drop, right_opacity). Objects with updaters must not be FadeIn'd (the fade
   suspends their updaters): fade via their own opacity tracker, or let them grow from zero size.
 - Labels on 3D geometry: `world.ScreenLabel` (screen-space offset), protected as annotations.
-- Framing changes must keep tests/test_composition.py green (band, title-safe, panels, HUD).
+- Framing changes must keep tests/test_composition.py green: every move and hold, R = 120/4/0,
+  zero variants in S5 (band, title-safe, panel column, formula/roots/tag, apex separation >= 0.8).
+  Rules live in `layout.frame_violations`; camera moves carry framing keyframes (`Move.via`,
+  monotone cubic) — search them with tools/frame_search.py rather than shrinking the zoom.
+- The height tag never moves or fades during camera moves; the camera paths keep the sheet clear.
 
 ## Quality bar
 No caption/visual overlap (automated), no caption shorter than its reading time (automated),

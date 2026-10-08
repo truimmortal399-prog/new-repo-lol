@@ -128,7 +128,8 @@ class LiveSurface(VGroup):
 
     def node_heights(self, sigma, omega):
         S = (sigma[:, None] + 1j * omega[None, :]) * KRAD
-        return ph.zmap(ph.to_db(self.mag_fn(S)))
+        # a NaN height would make its face vanish and corrupt the whole depth sort: floor it
+        return np.nan_to_num(ph.zmap(ph.to_db(self.mag_fn(S))), nan=0.0)
 
     def outline_points(self):
         """Node grid in world space: a cheap, exact-enough outline for bbox/overlap checks."""

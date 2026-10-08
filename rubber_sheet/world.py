@@ -73,7 +73,8 @@ class AxisLabels(VGroup):
         super().__init__()
         smin, smax = th.SIGMA_RANGE
         omin, omax = th.OMEGA_RANGE
-        self.sigma = MathTex(r"\sigma", font_size=th.SIZE_MATH, color=th.MUTED).move_to(xyz(smax + 0.9, 0))
+        # above the axis end, clear of the '5' tick label below it
+        self.sigma = MathTex(r"\sigma", font_size=th.SIZE_MATH, color=th.MUTED).move_to(xyz(smax + 0.9, 1.3))
         self.jw = MathTex(r"j\omega", font_size=th.SIZE_MATH, color=th.MUTED).move_to(xyz(-2.6, omax - 0.9))
         self.add(self.sigma, self.jw)
         for leaf in self.get_family():

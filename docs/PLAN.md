@@ -218,16 +218,27 @@ S7 61.00–76.00.
 5. Final: ffprobe (resolution, 60 fps, duration, no audio) + 4K/1080p keyframe spot-check.
 
 ## 11. Render and delivery
-```bash
-tools/render.sh final1080   # RS_QUALITY=final manim -qh --fps 60 per scene, xargs -P 3
-ffmpeg -f concat -safe 0 -i out/scenes.txt -c copy out/concat.mp4
-ffmpeg -i out/concat.mp4 -an -c:v libx264 -preset slow -crf 18 -tune animation \
-  -pix_fmt yuv420p -movflags +faststart out/the_rubber_sheet_1080p60.mp4
-```
-4K/1440p: same with `-qk`/`-qp`, CRF 16, only if Gate 3 projects < 3 h wall. Estimates (to be
-replaced by Gate 3 measurements of `scenes/bench_live.py`): ≈ 4.1k 3D frames; 1080p ≈ 0.6–1.5 h
-wall; 4K ≈ 2–6 h wall. 1080p committed if < 100 MB; 4K as a GitHub Release asset (if this
-session's tools can create releases — checked at Gate 3).
+**Encode path (decided before Gate 3; one lossy generation, BT.709).**
+1. Every scene is rendered **lossless in RGB**: `manim.cfg` sets `codec = libx264rgb`,
+   `pixel_format = rgb24` (stored as `gbrp`), `qp = 0`, `preset = veryfast`. No YUV conversion
+   happens inside Manim (its PyAV path would otherwise convert RGBA → BT.601 yuv420p, untagged).
+   Never pass `--encoder-option`/`--config_file` (they replace this table instead of merging).
+2. Scenes are joined by **stream copy** (all share one encoder spec):
+   `ffmpeg -f concat -safe 0 -i out/scenes.txt -c copy out/concat_rgb.mkv`
+3. **One final lossy encode**, RGB → BT.709 limited-range 4:2:0, tagged bt709:
+   ```bash
+   ffmpeg -i out/concat_rgb.mkv -an \
+     -vf "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p" \
+     -c:v libx264 -preset slow -crf 18 -tune animation \
+     -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv \
+     -movflags +faststart out/the_rubber_sheet_1080p60.mp4
+   ```
+   4K/1440p master: the same from the 4K/1440p scene renders, CRF 16.
+   Verified on a colour swatch: lossless intermediates are bit-exact; after the final encode every
+   accent decodes within 3 levels of its theme value (the old untagged-BT.601 path could shift
+   accents by ~15 levels in BT.709-assuming players).
+4. Deliverables: 1080p committed if < 100 MB. 4K hand-over: this session's GitHub tools cannot
+   create releases or upload assets (read-only release tools only) — see the Gate 3 report.
 
 ## 12. Gates
 1. Install, LaTeX + font smoke test, test_physics.py. (done; pre-Gate-2 fixes: scene cuts moved

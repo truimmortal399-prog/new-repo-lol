@@ -64,6 +64,8 @@ def mag_zero(s, R, z):
         return mag_C(s, R)
     s = np.asarray(s, dtype=complex)
     rc = R * C
+    if rc == 0.0:  # H_R = RCs * H_C is identically 0 when R = 0 (avoid 0 * inf at the poles)
+        return np.zeros(s.shape)
     with np.errstate(divide="ignore", invalid="ignore"):
         return np.abs(rc * (z - s)) / (np.abs(rc * z - 1.0) * np.abs(denominator(s, R)))
 

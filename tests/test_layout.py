@@ -88,3 +88,27 @@ def test_readout_keeps_scale_after_value_change():
     r.update()
     h1 = max(s.height for s in r.slots if s.has_points())
     assert abs(h1 / h0 - 0.5) < 0.02
+
+
+def test_readout_label_follows_number_without_moving_it():
+    """label_follows: the decimal point never moves; the label hugs the leading digit and only
+    moves when the digit count changes."""
+    v = ValueTracker(120.0)
+    r = Readout("<i>R</i> =", v.get_value, "{:.1f}", unit="Ω", n_slots=5, label_follows=True).place([-6.3, -1.75, 0])
+
+    def dot_x():
+        return [s.get_center()[0] for s, ch in zip(r.slots, r.text) if ch == "."][0]
+
+    def gap():
+        first = next(s for s, ch in zip(r.slots, r.text) if ch.strip())
+        return first.get_left()[0] - r.label.get_right()[0]
+
+    seen = []
+    for val in (120.0, 99.9, 57.3, 9.9, 4.0):
+        v.set_value(val)
+        r.update()
+        seen.append((dot_x(), gap()))
+    dots = [d for d, _ in seen]
+    gaps = [g for _, g in seen]
+    assert max(dots) - min(dots) < 1e-9  # the number never moves
+    assert max(gaps) < 0.2 and min(gaps) > 0.0  # label always close to the leading digit
