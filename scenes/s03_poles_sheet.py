@@ -15,7 +15,7 @@ import os
 import sys
 
 import numpy as np
-from manim import RIGHT, FadeIn, FadeOut, LaggedStart, Line, Text, ThreeDScene, Transform, VGroup, Write
+from manim import RIGHT, FadeIn, FadeOut, LaggedStart, Line, Text, ThreeDScene, VGroup, Write
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rubber_sheet import camera as cam  # noqa: E402
@@ -71,12 +71,13 @@ class S3PolesSheet(ThreeDScene):
             pole_labels.add(lab)
         rig.add_fixed_orientation_mobjects(*pole_labels, use_static_center_func=True)
 
-        rig.add_fixed_in_frame_mobjects(formula, scrim, roots, tag, *flyers)
+        rig.add_fixed_in_frame_mobjects(formula, scrim, roots, tag, *flyers, *landing)
         track.register_fixed()
         self.add(sheet.surface)  # invisible until 18.0 (opacity tracker 0); its updater runs throughout
         self.add(scrim, formula)
 
         # --- protected visuals (overlap checker) -----------------------------------------------
+        track.allow_world(floor.ticks, floor.unit)  # flat labels on the floor, faded before the tilt
         track.protect("formula", formula, True)
         track.protect("roots", roots, True)
         track.protect("height tag", tag, True)
@@ -89,13 +90,16 @@ class S3PolesSheet(ThreeDScene):
         tl.at(11.60, FadeIn(floor, run_time=0.8, rate_func=th.ENTER), FadeIn(labels, run_time=0.8, rate_func=th.ENTER))
         tl.at(11.80, Write(roots[0], run_time=0.8))
         tl.at(12.70, FadeIn(roots[1], shift=0.06 * RIGHT, run_time=0.6, rate_func=th.ENTER))
-        tl.at(13.40, *[Transform(f, l, run_time=1.0, rate_func=th.SWEEP) for f, l in zip(flyers, landing)])
+        # Only registered (fixed) mobjects may be rendered: no FadeTransform/TransformFromCopy here, they
+        # put unregistered copies on screen, which a ThreeDScene projects as world objects.
+        tl.at(13.40, *[f.animate(run_time=1.0, rate_func=th.SWEEP).move_to(p).scale(0.5).set_opacity(0.0) for f, p in zip(flyers, targets)])
+        tl.at(13.85, *[FadeIn(m, scale=1.8, run_time=0.55, rate_func=th.ENTER) for m in landing])
         tl.at(13.60, LaggedStart(*[FadeIn(d) for d in circle], lag_ratio=0.03, run_time=1.0))
-        tl.at(14.40, *[FadeOut(f, run_time=SWAP) for f in flyers], FadeIn(sheet.crosses, run_time=SWAP))
+        tl.at(14.40, *[FadeOut(m, run_time=SWAP) for m in landing], FadeIn(sheet.crosses, run_time=SWAP))
         tl.at(15.40, FadeOut(roots, run_time=0.4, rate_func=th.EXIT))
         tl.at(15.60, *move_anims(rig, cam.MOVES[0]))
         tl.at(15.60, FadeOut(VGroup(floor.ticks, floor.unit), run_time=0.8, rate_func=th.EXIT))
-        tl.at(18.00, sheet.opacity.animate(run_time=0.8, rate_func=th.ENTER).set_value(1.0))
+        tl.at(18.00, sheet.opacity.animate(run_time=2.0, rate_func=th.SWEEP).set_value(1.0))
         tl.at(18.00, sheet.lift.animate(run_time=2.5, rate_func=th.SWEEP).set_value(1.0))
         tl.at(18.00, FadeIn(sheet.tents, run_time=0.4), FadeIn(tag, run_time=0.6, rate_func=th.ENTER))
         tl.at(21.00, *move_anims(rig, cam.MOVES[1]))

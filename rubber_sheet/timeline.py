@@ -13,7 +13,7 @@ Mechanics (Manim CE 0.22, verified):
   during camera moves and lose depth order between static and moving mobjects).
 """
 
-from manim import AnimationGroup, Group, Succession, VectorizedPoint, Wait
+from manim import AnimationGroup, Group, Succession, VectorizedPoint, Wait, config
 from manim.animation.animation import Animation, prepare_animation
 
 from rubber_sheet import script as sc
@@ -34,21 +34,33 @@ class EnsureIn(Animation):
         pass
 
 
+def clamp_local(local, fps, what):
+    """A clip at a cut may sit < 1 frame before the grid-rounded scene start: start it on frame 0."""
+    if local < -1.0 / fps - 1e-9:
+        raise ValueError(f"{what} precedes the scene start by more than a frame")
+    return max(round(local, 6), 0.0)
+
+
 class Timeline:
-    def __init__(self, scene_id):
+    """Local time 0 is the scene's first frame on the global grid (script.scene_frames), so frame j
+    of this scene shows film time t0 + j / fps exactly; clips are placed in that local time."""
+
+    def __init__(self, scene_id, fps=None):
         self.scene_id = scene_id
-        self.t0, self.t1 = sc.SCENES[scene_id]
+        self.fps = float(fps or config.frame_rate)
+        first, self.n_frames = sc.scene_frames(scene_id, self.fps)
+        self.t0 = first / self.fps
+        self.t1 = sc.SCENES[scene_id][1]
         self.clips = []  # (local_start, animation)
 
     @property
     def duration(self):
-        return self.t1 - self.t0
+        """Run time that makes play() emit exactly n_frames frames (play emits ceil(rt * fps))."""
+        return (self.n_frames - 0.5) / self.fps
 
     def at(self, t_film, *animations):
         """Schedule animations starting at film time t_film."""
-        local = round(t_film - self.t0, 6)
-        if local < -1e-9:
-            raise ValueError(f"{self.scene_id}: clip at {t_film} precedes scene start {self.t0}")
+        local = clamp_local(t_film - self.t0, self.fps, f"{self.scene_id}: clip at {t_film}")
         for anim in animations:
             self.clips.append((local, prepare_animation(anim)))
         return self
@@ -62,7 +74,7 @@ class Timeline:
         parts = []
         for local, anim in self.clips:
             end = local + anim.get_run_time()
-            if end > self.duration + 1e-6:
+            if end > self.n_frames / self.fps + 1e-6:
                 raise ValueError(f"{self.scene_id}: clip ends at {end + self.t0:.3f} after scene end {self.t1}")
             steps = [] if local <= 1e-9 else [Wait(local)]
             if not anim.is_introducer() and anim.mobject is not None:

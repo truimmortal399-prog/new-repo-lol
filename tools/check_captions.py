@@ -51,6 +51,13 @@ def main():
             print(f"FAIL overlap: {vis} intersects {other} at {len(ts)} checks, t = {ts[0]:.2f}–{ts[-1]:.2f}")
     else:
         print("OK   no overlap violations")
+    strays = log.get("strays", {})
+    if strays:
+        ok = False
+        for key, (t0, t1, at) in strays.items():
+            print(f"FAIL stray unregistered mobject {key} first at {at}, visible {t0:.2f}–{t1:.2f} (renders projected)")
+    else:
+        print("OK   no stray unregistered mobjects")
     sys.exit(0 if ok else 1)
 
 

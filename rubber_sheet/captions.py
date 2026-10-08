@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 import numpy as np
 from manim import (
     UP,
+    VMobject,
+    config,
     AnimationGroup,
     Create,
     FadeIn,
@@ -27,8 +29,11 @@ from manim import (
     VGroup,
 )
 
+from manim.utils.family import extract_mobject_family_members
+
 from rubber_sheet import script as sc
 from rubber_sheet import theme as th
+from rubber_sheet.timeline import clamp_local
 
 _TOKEN = re.compile(r"\{(POLE|ZERO|SIGNAL):([^{}]*)\}|\$([^$]*)\$|(\s+)|([^\s{$]+)")
 _DESCENDERS = set("gjpqyQ,;()|")
@@ -253,10 +258,13 @@ class CaptionTrack:
     def __init__(self, scene, scene_id, check_every=1):
         self.scene = scene
         self.scene_id = scene_id
-        self.t0 = sc.SCENES[scene_id][0]
+        self.fps = float(config.frame_rate)
+        self.t0 = sc.scene_start_on_grid(scene_id, self.fps)  # same grid origin as Timeline
         self.captions = {line.id: Caption(line) for line in sc.lines_for(scene_id)}
         self.protected = []  # (name, mobject or callable returning mobject, is_fixed)
         self.violations = []
+        self.world_flat = set()  # non-3D mobjects intentionally drawn as world objects (floor ticks)
+        self.strays = {}  # description -> [first_t, last_t]
         self.observed = {cid: [] for cid in self.captions}
         self.check_every = check_every
         self._frame = 0
@@ -272,9 +280,14 @@ class CaptionTrack:
         out = []
         for cid, cap in self.captions.items():
             line = cap.line
-            out.append((line.reveal - self.t0, cap.reveal()))
-            out.append((line.hold_end - self.t0, cap.exit()))
+            out.append((clamp_local(line.reveal - self.t0, self.fps, cid), cap.reveal()))
+            out.append((clamp_local(line.hold_end - self.t0, self.fps, cid), cap.exit()))
         return out
+
+    def allow_world(self, *mobs):
+        """Declare non-3D mobjects that are meant to be projected as world objects."""
+        for m in mobs:
+            self.world_flat.update(m.get_family())
 
     def protect(self, name, mob, fixed):
         """Register a key visual that must never enter the caption band or a caption's box."""
@@ -298,6 +311,7 @@ class CaptionTrack:
                         self.observed[cid].append(round(t_local + self.t0, 4))
             if self._frame % self.check_every:
                 return
+            self._check_strays(in_scene, t_local + self.t0)
             band = (th.CAPTION_BAND["x0"], th.CAPTION_BAND["y0"], th.CAPTION_BAND["x1"], th.CAPTION_BAND["y1"])
             boxes = [("band", band)] + [(cid, _bbox_fixed(c.words)) for cid, c in visible.items() if c.line.region != "band"]
             for name, mob, fixed in self.protected:
@@ -312,6 +326,27 @@ class CaptionTrack:
                         self.violations.append(dict(t=round(t_local + self.t0, 3), visual=name, with_=other))
 
         return update
+
+    def _check_strays(self, in_scene, t):
+        """Visible non-3D VMobjects in a 3D scene that are neither fixed-in-frame, fixed-orientation
+        nor declared world-flat: e.g. copies put on screen by FadeTransform. They render projected."""
+        cam = self.scene.camera
+        if not hasattr(cam, "fixed_in_frame_mobjects"):
+            return
+        fixed = cam.fixed_in_frame_mobjects
+        if hasattr(cam, "fixed_roots"):  # RigCamera re-derives this set at capture time
+            fixed = set(extract_mobject_family_members(cam.fixed_roots))
+        for m in in_scene:
+            if not isinstance(m, VMobject) or getattr(m, "shade_in_3d", False) or not m.has_points():
+                continue
+            if m in fixed or m in cam.fixed_orientation_mobjects or m in self.world_flat:
+                continue
+            if max(m.get_fill_opacity(), m.get_stroke_opacity() if m.get_stroke_width() > 0 else 0.0) < 0.02:
+                continue
+            key = f"{type(m).__name__}#{id(m):x}"
+            if key not in self.strays:
+                self.strays[key] = [round(t, 3), round(t, 3), np.round(m.get_center(), 2).tolist()]
+            self.strays[key][1] = round(t, 3)
 
     def write_log(self, path=None):
         path = path or os.path.join("out", "captions", f"{self.scene_id}.json")
@@ -333,7 +368,7 @@ class CaptionTrack:
                 )
             )
         with open(path, "w") as f:
-            json.dump(dict(scene=self.scene_id, captions=entries, violations=self.violations), f, indent=2)
+            json.dump(dict(scene=self.scene_id, captions=entries, violations=self.violations, strays=self.strays), f, indent=2)
         return path
 
 

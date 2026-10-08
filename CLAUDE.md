@@ -58,6 +58,9 @@ Stop and report at each gate. Never start S1/S2/S4–S7 before Gates 2 and 3 are
   `EnsureIn` before non-introducer clips, a driver mobject at the back (everything redrawn).
 - Camera shading is off; `LiveSurface` shades its faces (vectorized Lambert).
 - `project_points` uses last frame's rotation inside updaters — use `RigCamera.screen_points`.
+- In 3D scenes never use animations that render copies (FadeTransform, TransformFromCopy,
+  ReplacementTransform targets): copies are not registered fixed-in-frame and get projected as
+  world objects. Animate registered mobjects only (`.animate`, FadeIn/FadeOut, Transform).
 - Run `.venv/bin/ruff check --select F,E9 --line-length 140 rubber_sheet scenes tools tests`.
 
 ## Quality bar

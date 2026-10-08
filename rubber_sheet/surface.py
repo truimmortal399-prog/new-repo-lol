@@ -36,6 +36,16 @@ def warped_nodes(a, b, n_cells, centers, amp=10.0, width=0.9, samples=1601):
     return nodes
 
 
+class SheetFace(ThreeDVMobject):
+    """Sheet quad whose depth-sort reference point is precomputed by LiveSurface (bbox centre of
+    its corners), instead of ThreeDCamera calling get_center() on every face every frame."""
+
+    zref = np.zeros(3)
+
+    def get_z_index_reference_point(self):
+        return self.zref
+
+
 def _segment_points(corners):
     """corners (F, 5, 3) closed quad -> (F, 16, 3) cubic Bezier points of straight segments."""
     a = corners[:, :-1, :]
@@ -71,7 +81,7 @@ class LiveSurface(VGroup):
         self.faces = []
         for i in range(self.n_sigma):
             for j in range(self.n_omega):
-                face = ThreeDVMobject()
+                face = SheetFace()
                 face.set_points_as_corners(np.zeros((5, 3)))
                 face.set_fill(th.SURFACE_STOPS[0][1], opacity=0.0)
                 face.set_stroke(th.FAINT, width=th.SURFACE_STROKE_WIDTH, opacity=0.0)
@@ -131,8 +141,10 @@ class LiveSurface(VGroup):
             [np.tile(self.stroke_rgb, (len(rgb), 1)), np.full((len(rgb), 1), th.SURFACE_STROKE_OPACITY * self.opacity.get_value())],
             axis=1,
         )
+        zref = 0.5 * (corners[:, :4].min(axis=1) + corners[:, :4].max(axis=1))
         for k, face in enumerate(self.faces):
             face.points = pts[k]
+            face.zref = zref[k]
             face.fill_rgbas = fill[k : k + 1]
             face.stroke_rgbas = stroke[k : k + 1]
         return self

@@ -105,6 +105,16 @@ def lines_for(scene):
     return [line for line in LINES if line.scene == scene]
 
 
-def local_time(line_time, scene):
-    """Film time -> time relative to the scene's start."""
-    return line_time - SCENES[scene][0]
+def scene_frames(scene, fps):
+    """(first_frame, n_frames) of a scene on the film's global frame grid.
+
+    Cuts are not frame multiples (e.g. 6.62 s); rounding each cut to the grid keeps every scene's
+    frames sampling the true film time, so cuts never accumulate drift."""
+    t0, t1 = SCENES[scene]
+    first, end = round(t0 * fps), round(t1 * fps)
+    return first, end - first
+
+
+def scene_start_on_grid(scene, fps):
+    first, _ = scene_frames(scene, fps)
+    return first / fps
