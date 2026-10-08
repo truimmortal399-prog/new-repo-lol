@@ -44,13 +44,14 @@ manim.cfg  pytest.ini
 rubber_sheet/ physics.py theme.py script.py beats.py camera.py rig.py timeline.py captions.py
               surface.py panels.py world.py common.py layout.py      (built at Gates 1–2)
               circuit.py                                               (S2, after Gate 3)
-scenes/ s03_poles_sheet.py  probe_fixed_frame.py bench_live.py         (built; probe/bench are throwaways)
-        s01_hook_title.py s02_circuit.py s04_slice_bode.py s05_zero_nail.py s06_sweep.py
-        s07_limit_payoff.py                                            (after Gate 3)
-tools/  smoke_test.py keyframes.py check_captions.py                   (built)
-        render.sh check_continuity.py check_palette.py                 (to build with the remaining scenes)
+scenes/ s03_poles_sheet.py s04_slice_bode.py s05_zero_nail.py s06_sweep.py   (built)
+        probe_fixed_frame.py bench_live.py probe_fabric.py                  (diagnostics)
+        s01_hook_title.py s02_circuit.py s07_limit_payoff.py                (after Gate 4)
+tools/  smoke_test.py keyframes.py check_captions.py frame_search.py still.py render_scene.py
+        time_bench.py time_scenes.py fabric_check.py text_sharpness.py crown_stills.py   (built)
+        render.sh check_continuity.py check_palette.py                    (with the remaining scenes)
 tests/  test_physics test_captions test_captions_render test_camera test_timeline test_panel_data
-        test_layout test_composition test_depth_sort
+        test_layout test_composition test_depth_sort test_scenes_monitor test_slice_and_zero
 ```
 
 ## 5. Theme
@@ -120,12 +121,18 @@ S1 0.00–6.62 · S2 6.62–11.60 · S3 11.60–25.00 · S4 25.00–35.72 · S5 
 S7 61.00–76.00.
 
 ### Camera moves (rubber_sheet/camera.py `MOVES`; peaks derived from start/end states — tested)
-| Move | Time | From → to (φ, θ) | Peak √(φ'²+θ'²) |
-|---|---|---|---|
-| S3 tilt | 15.60–20.60 | (0, −90) → (58, −90) | 13.81°/s |
-| S3 θ swing | 21.00–24.60 | (58, −90) → (58, −50) | 14.29°/s |
-| S4 swing to CUT | 25.40–30.20 | (58, −50) → (82, 0) | 13.87°/s |
-| S5 return to ANALYSIS | 35.72–39.92 | (82, 0) → (60, −40) | 13.43°/s |
+Framing (zoom/pan) follows monotone-cubic keyframes found by tools/frame_search.py against
+layout.frame_violations; every move is checked at 120 samples (tests) and 200 (frame_search).
+| Move | Time | From → to (φ, θ, zoom) | Peak √(φ'²+θ'²) | Peak pan |
+|---|---|---|---|---|
+| S3 tilt and swing | 15.00–21.00 | TOP (0, −90, 0.82) → S3_END (58, −50, 0.74) | 13.55°/s | 0.19/s |
+| S4 swing to CUT | 25.40–30.20 | S3_END → CUT (82, 0, 0.78) | 13.87°/s | 1.26/s |
+| S5 return to ANALYSIS | 35.72–39.92 | CUT → ANALYSIS (64, −40, 0.64) | 12.90°/s | 0.52/s |
+| S6 drift | 49.50–61.00 | ANALYSIS → ANALYSIS_DRIFT (64, −48, 0.63) | 0.75°/s | 0.02/s |
+Gate 4 re-framing: tent-pole tops (ceiling + 0.3, the highest 3D points) joined the rules and hit
+the height tag at R = 120 in the old CUT (pan y −0.6) and ANALYSIS (60°, zoom 0.66) — at 0.66 there
+was no room between the tag and the caption band at any angle searched; CUT pan y → −0.88, ANALYSIS
+→ (64°, −40°, 0.64). S4/S5 keyframes re-searched with the gold plane and the new HUD boxes.
 
 ### Visual timeline
 - **S1 0.00–6.62 Hook + title.** Sheet, poles punching up, gold jω glow, HERO orbit 3°/s; title
@@ -138,15 +145,24 @@ S7 61.00–76.00.
   fade); lift + sheet fade from 18.0 (2.5 s / 2.0 s); tag `height = 20 log₁₀|H| (dB)` with
   "floor −40 dB · soft ceiling +40 dB" at 18.0 (persists); jω floor label fades at 18.0; tent
   poles grow with the lift; θ −90→−50° 21.0–24.6; "pole" labels (screen-anchored) 21.2.
-- **S4 25.0–35.72 Slice → Bode.** Gold σ = 0 plane 25.3; σ > 0 half lowers/fades 26.0–27.5; swing
-  to CUT 25.4–30.2; 3D→fixed handoff 30.3; fly to panel 30.4–31.8; log warp 33.2–35.2
-  (droppable); hold to 35.72.
-- **S5 35.72–48.31 Zero.** Camera return to ANALYSIS + sheet restore 35.72–39.92.
-  Probe C→R + formula H_R 36.2–37.2. Disclosure tag 37.2–46.8. Zero: −∞→−15 krad/s 37.4–38.0
-  (b = −1/z linear; teal edge arrow), −15→0 38.0–41.0 (linear), hold 41.0–43.6, 0→−15 43.6–46.2,
-  −15→−∞ 46.2–46.8. Probe R→C + formula H_C 45.6–46.6.
-- **S6 48.31–61.0 Sweep.** Impulse panel joins 48.31–49.5; sweep 49.5–61.0, R = 120 → 4 Ω (log);
-  poles glide on |s| = ω₀; Bode peak + readouts; h(t) + coral envelope; slow θ drift 8°.
+- **S4 25.0–35.72 Slice → Bode (built).** S3's pole labels leave 25.0–25.35 (camera holding);
+  gold σ = 0 plane 25.3 (split at the cut height: no painter's-order teeth); 'jω' at the far end of
+  the floor's jω axis 25.5; σ label leaves 25.6; exact jω cut grows 25.7–26.3; σ > 0 half lowers
+  and fades 26.3–27.5 (the plane's lower part shows as the gold cross-section); plane leaves
+  27.4–28.0; swing to CUT 25.4–30.2; handoff 30.3 (identical fixed curve), fly to the panel's
+  linear-ω axis 30.4–31.8 with panel + 'output: v_C' fading in 30.6–31.4; swap to the live curve
+  31.8; log warp 33.2–35.2 (5/15 ticks fade, 1/10/100 slide); hold to 35.72.
+- **S5 35.72–48.31 Zero (built).** Return to ANALYSIS 35.72–39.92; 'jω' leaves 35.8; σ > 0 half
+  rises back 36.0–37.5; probe v_C → v_R and numerator 1 → RCs 36.2–36.8 (only those glyphs);
+  disclosure 'interpolated: zero moved by hand' 37.2–47.4; zero u: −∞ → edge 37.2–38.0 (b = −1/z
+  linear, 'from −∞' label), edge → 0 38.0–41.0 (ease out), hold, 0 → edge 43.6–46.2 (ease in),
+  edge → −∞ 46.2–47.0 ('to −∞'); teal nail + floor ring 37.85–46.35, 'zero' label 38.35–46.05; the
+  sheet, the jω cut (dives to the floor at ω = 0) and the Bode panel (band-pass) follow H_z; probe
+  v_R → v_C, numerator back 45.6–46.2; σ label returns 39.3. (Plan rev. 3 had 37.4/46.8 for the
+  zero's off-screen phases: lengthened to 0.8 s so the speed matches at the domain edge.)
+- **S6 48.31–61.0 Sweep (built).** Impulse panel + R/ζ readouts + gold Bode peak readout join
+  48.31–49.5 (opacity trackers); sweep 49.5–61.0, R = 120·(4/120)^u, u = smooth(α); poles glide on
+  |s| = ω₀; sheet, cut, Bode, h(t) + envelope, readouts follow; camera drift θ −40 → −48°.
 - **S7 61.0–76.0 Limit + payoff.** R 4 → 0 61.3–64.3 with push-in 61.5–64.8; ∞ marker; sustained
   ringing. Pull back 68.2–70.8; R eases to 40 Ω; C17; clean final frame 74.2–75.6; fade 75.6–76.0.
 
@@ -259,11 +275,17 @@ concat in its final encode (supersampled anti-aliasing, no second render).
 Projected file sizes (bench bitrate; real content varies): 4K ≈ 30–80 MB, 1080p ≈ 10–25 MB.
 Lossless intermediates ≈ 1.5 GB at 4K (disk has > 25 GB free).
 
+## 11b. Gate 4 measurements
+See the Gate 4 report: real-scene timing (tools/time_scenes.py, tools/render_scene.py), fabric
+shimmer check (tools/fabric_check.py), text sharpness (tools/text_sharpness.py).
+
 ## 12. Gates
 1. Install, LaTeX + font smoke test, test_physics.py. (done; pre-Gate-2 fixes: scene cuts moved
    so no caption crosses one, pytest.ini, state-derived camera test, impulse atol 1e-6)
 2. LiveSurface, captions, theme, S3 at preview + keyframes; fixed-in-frame probe; bench_live.py.
    (done, pending approval; reviewed by a 4-lens adversarial workflow, findings fixed)
 3. 2 s timing of bench_live.py at 4K60 and 1080p60 → full estimate, 4K go/no-go.
-   (done, pending approval: 4K GO, ≈ 30–40 min projected wall; see §11)
-Remaining scenes only after Gates 2 and 3 are approved.
+   (approved: 4K GO; 1080p by Lanczos downscale of the 4K master)
+4. S4, S5, S6 built, tested (test_scenes_monitor, test_slice_and_zero, dense composition), rendered
+   at 1080p60 final mesh; fabric shimmer, text sharpness, real-scene timing. (pending approval)
+Then S7, S1, S2; then the full 4K render.
