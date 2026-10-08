@@ -6,7 +6,7 @@ from manim import DOWN, LEFT, RIGHT, UL, MarkupText, MathTex, Text, ValueTracker
 from rubber_sheet import physics as ph
 from rubber_sheet import theme as th
 from rubber_sheet import world
-from rubber_sheet.surface import Z_CEIL, LiveSurface, TentPole
+from rubber_sheet.surface import TENT_TOP, Z_CEIL, LiveSurface, TentPole
 
 FORMULA_ANCHOR_BUFF = 0.72  # keeps the formula inside the 5% title-safe area
 
@@ -116,7 +116,7 @@ class SheetAssembly:
             *[
                 TentPole(
                     lambda k=k: tuple(world.xyz(self.pole(k).real, self.pole(k).imag)[:2]),
-                    lambda: (Z_CEIL + 0.3) * self.lift.get_value(),
+                    lambda: TENT_TOP * self.lift.get_value(),
                     lambda: Z_CEIL * self.lift.get_value(),
                     th.POLE,
                 )
@@ -149,5 +149,5 @@ class SheetAssembly:
 
     def pole_top(self, k):
         p = self.pole(k)
-        return world.xyz(p.real, p.imag, (Z_CEIL + 0.3) * self.lift.get_value())
+        return world.xyz(p.real, p.imag, TENT_TOP * self.lift.get_value())
 

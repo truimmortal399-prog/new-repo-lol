@@ -29,7 +29,7 @@ from rubber_sheet import physics as ph  # noqa: E402
 from rubber_sheet import theme as th  # noqa: E402
 from rubber_sheet.panels import BodePanel  # noqa: E402
 from rubber_sheet.rig import RigCamera, apply_state, move_anims  # noqa: E402
-from rubber_sheet.surface import Z_CEIL, CutCurve, _polyline_cubics  # noqa: E402
+from rubber_sheet.surface import TENT_TOP, CutCurve, _polyline_cubics  # noqa: E402
 from rubber_sheet.timeline import Timeline  # noqa: E402
 
 th.configure()
@@ -71,7 +71,7 @@ class S4SliceBode(ThreeDScene):
         for k in (0, 1):  # exactly as S3 leaves them
             lab = Text("pole", font=th.FONT_BODY, font_size=th.SIZE_LABEL, color=th.POLE)
             offset = (-0.22, 0.12) if k == 0 else (0.22, 0.12)
-            pole_labels.add(world.ScreenLabel(lab, rig, lambda k=k: world.xyz(sheet.pole(k).real, sheet.pole(k).imag, Z_CEIL + 0.3), offset))
+            pole_labels.add(world.ScreenLabel(lab, rig, lambda k=k: world.xyz(sheet.pole(k).real, sheet.pole(k).imag, TENT_TOP), offset))
         jw_opacity = ValueTracker(0.0)
         jw_label = world.ScreenLabel(MathTex(r"j\omega", font_size=th.SIZE_MATH, color=th.MUTED), rig,
                                      lambda: world.xyz(*L.JW_LABEL_ANCHOR), L.JW_LABEL_OFFSET, opacity=jw_opacity)

@@ -128,11 +128,13 @@ layout.frame_violations; every move is checked at 120 samples (tests) and 200 (f
 | S3 tilt and swing | 15.00–21.00 | TOP (0, −90, 0.82) → S3_END (58, −50, 0.74) | 13.55°/s | 0.19/s |
 | S4 swing to CUT | 25.40–30.20 | S3_END → CUT (82, 0, 0.78) | 13.87°/s | 1.26/s |
 | S5 return to ANALYSIS | 35.72–39.92 | CUT → ANALYSIS (64, −40, 0.64) | 12.90°/s | 0.52/s |
-| S6 drift | 49.50–61.00 | ANALYSIS → ANALYSIS_DRIFT (64, −48, 0.63) | 0.75°/s | 0.02/s |
+| S6 drift | 49.50–61.00 | ANALYSIS → ANALYSIS_DRIFT (64, −48, 0.64) | 0.75°/s | 0.01/s |
 Gate 4 re-framing: tent-pole tops (ceiling + 0.3, the highest 3D points) joined the rules and hit
 the height tag at R = 120 in the old CUT (pan y −0.6) and ANALYSIS (60°, zoom 0.66) — at 0.66 there
 was no room between the tag and the caption band at any angle searched; CUT pan y → −0.88, ANALYSIS
 → (64°, −40°, 0.64). S4/S5 keyframes re-searched with the gold plane and the new HUD boxes.
+Post-Gate-4: tent overshoot 0.3 → 0.2 (surface.TENT_TOP); all moves still pass at 200 samples with
+the same keyframes (more margin); the S6 drift became a pure rotation at zoom 0.64.
 
 ### Visual timeline
 - **S1 0.00–6.62 Hook + title.** Sheet, poles punching up, gold jω glow, HERO orbit 3°/s; title

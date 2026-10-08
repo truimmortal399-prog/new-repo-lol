@@ -23,7 +23,7 @@ from rubber_sheet import beats as bt  # noqa: E402
 from rubber_sheet import captions, common, world  # noqa: E402
 from rubber_sheet import theme as th  # noqa: E402
 from rubber_sheet.rig import RigCamera, apply_state, move_anims  # noqa: E402
-from rubber_sheet.surface import Z_CEIL  # noqa: E402
+from rubber_sheet.surface import TENT_TOP  # noqa: E402
 from rubber_sheet.timeline import Timeline  # noqa: E402
 
 th.configure()
@@ -71,7 +71,7 @@ class S3PolesSheet(ThreeDScene):
             lab = Text("pole", font=th.FONT_BODY, font_size=th.SIZE_LABEL, color=th.POLE)
             # lower pole (nearer the camera during the theta swing): label up-left, clear of the far crown
             offset = (-0.22, 0.12) if k == 0 else (0.22, 0.12)
-            pole_labels.add(world.ScreenLabel(lab, rig, lambda k=k: world.xyz(sheet.pole(k).real, sheet.pole(k).imag, Z_CEIL + 0.3), offset))
+            pole_labels.add(world.ScreenLabel(lab, rig, lambda k=k: world.xyz(sheet.pole(k).real, sheet.pole(k).imag, TENT_TOP), offset))
         rig.add_fixed_in_frame_mobjects(formula, scrim, roots, tag, *flyers, *pole_labels)
         track.register_fixed()
         self.add(sheet.surface, sheet.tents)  # invisible until 18.0 (opacity 0, zero-length poles)
@@ -107,7 +107,7 @@ class S3PolesSheet(ThreeDScene):
         tl.at(s3_move.t0, FadeOut(VGroup(floor.ticks, floor.unit), run_time=0.8, rate_func=th.EXIT))
         tl.at(bt.S3_LIFT_START, sheet.opacity.animate(run_time=bt.S3_SHEET_FADE_RUN, rate_func=th.SWEEP).set_value(1.0))
         tl.at(bt.S3_LIFT_START, sheet.lift.animate(run_time=bt.S3_LIFT_RUN, rate_func=th.SWEEP).set_value(1.0))
-        # Tent poles are in the scene from the start: their length is (ceiling + 0.3) * lift, so
+        # Tent poles are in the scene from the start: their length is TENT_TOP * lift, so
         # they grow out of the floor with the lift. (A FadeIn would suspend their updaters.)
         tl.at(bt.S3_LIFT_START, FadeIn(tag, run_time=0.6, rate_func=th.ENTER))
         # the jw floor label would be half-covered by the lifted sheet's far edge; S4 labels the

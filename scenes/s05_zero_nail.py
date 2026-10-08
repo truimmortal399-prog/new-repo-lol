@@ -2,7 +2,7 @@
 
 Beats (film time; spans and the zero schedule in rubber_sheet/beats.py):
   35.72  camera returns CUT -> ANALYSIS (4.2 s); the 'jw' label leaves; 'output: v_C' appears
-  36.00  the sigma > 0 half comes back (S4 lowered it)
+  36.00  the sigma > 0 half fades back in, in place (S4 lowered and hid it)
   36.20  probe moves C -> R: v_C -> v_R, numerator 1 -> RCs (formula H_R)
   37.20  disclosure 'interpolated: zero moved by hand'; the zero arrives from -inf (b = -1/z
          linear) to the domain edge at 38.0, then slides to the origin 38.0-41.0 (H_z is a real
@@ -56,7 +56,9 @@ class S5ZeroNail(ThreeDScene):
         # --- world: S4's end state ------------------------------------------------------------
         sheet = common.SheetAssembly(lift=1.0, opacity=1.0, zero=zero)
         surf = sheet.surface
-        surf.right_drop.set_value(bt.RIGHT_DROP_DEPTH)
+        # S4 left the sigma > 0 half lowered AND fully transparent: back at its height at once
+        # (invisible), then it fades in in place (no dark slab rising under the sheet)
+        surf.right_drop.set_value(0.0)
         surf.right_opacity.set_value(0.0)
         floor = world.SPlaneFloor()
         floor.remove(floor.ticks, floor.unit)
@@ -132,9 +134,7 @@ class S5ZeroNail(ThreeDScene):
         back = cam.moves_in("S5")[0]
         tl.at(back.t0, *move_anims(rig, back))
         tl.at(bt.S5_JW_LABEL_OUT[0], jw_opacity.animate(run_time=run(bt.S5_JW_LABEL_OUT), rate_func=th.EXIT).set_value(0.0))
-        tl.at(bt.S5_RIGHT_RESTORE[0],
-              surf.right_drop.animate(run_time=run(bt.S5_RIGHT_RESTORE), rate_func=th.SWEEP).set_value(0.0),
-              surf.right_opacity.animate(run_time=run(bt.S5_RIGHT_RESTORE), rate_func=th.SWEEP).set_value(1.0))
+        tl.at(bt.S5_RIGHT_RESTORE[0], surf.right_opacity.animate(run_time=run(bt.S5_RIGHT_RESTORE), rate_func=th.SWEEP).set_value(1.0))
         # probe C -> R: only the subscript and the numerator change (registered mobjects only)
         swap = dict(run_time=run(bt.S5_PROBE_TO_R), rate_func=th.SWEEP)
         tl.at(bt.S5_PROBE_TO_R[0], FadeOut(sub_C, shift=0.12 * UP, **swap), FadeIn(sub_R, shift=0.12 * UP, **swap),

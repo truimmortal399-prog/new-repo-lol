@@ -75,7 +75,7 @@ Stop and report at each gate. Never start S1/S2/S4–S7 before Gates 2 and 3 are
   Rules live in `layout.frame_violations`; camera moves carry framing keyframes (`Move.via`,
   monotone cubic) — search them with tools/frame_search.py rather than shrinking the zoom.
 - The height tag never moves or fades during camera moves; the camera paths keep the sheet clear.
-- Tent-pole tops (ceiling + 0.3) are the highest 3D points and are part of the framing rules.
+- Tent-pole tops (surface.TENT_TOP = ceiling + 0.2) are the highest 3D points and are part of the framing rules.
 - Timeline: AnimationGroup runs its clock as rate(alpha) * latest clip end; Timeline pins it to
   scene time (a clip may end one frame after the last frame — S4's C8 exit did, 8 ms drift).
 - Inside the one-play Timeline a FadeOut leaves its mobject faded (opacity 0) until the scene's

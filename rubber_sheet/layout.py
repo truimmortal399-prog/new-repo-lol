@@ -11,7 +11,7 @@ from rubber_sheet import physics as ph
 from rubber_sheet import theme as th
 from rubber_sheet import world
 from rubber_sheet.camera import state_at_time
-from rubber_sheet.surface import Z_CEIL
+from rubber_sheet.surface import TENT_TOP
 
 SAFE_X = th.FRAME_W / 2 * (1 - th.SAFE_MARGIN)  # 6.76 -> captions use 6.4; keep visuals inside ±6.4
 SAFE_Y = th.FRAME_H / 2 * (1 - 2 * th.SAFE_MARGIN)  # 3.6
@@ -39,16 +39,6 @@ def sheet_points(R, lift):
 
     sheet = SheetAssembly(R=R, lift=lift, opacity=1.0)
     return sheet.surface.outline_points()
-
-
-def pole_label_points(R, lift):
-    pts = []
-    for p in ph.poles(R) / 1e3:
-        top = (Z_CEIL + 0.55) * lift
-        for dx in (0.15, 0.85):  # label spans ~0.42 +/- 0.35 to the right of the pole line
-            for dz in (-0.15, 0.2):
-                pts.append(world.xyz(p.real, p.imag, top + dz) + np.array([dx, 0.0, 0.0]))
-    return np.array(pts)
 
 
 def states_along(move, n=12):
@@ -93,14 +83,14 @@ def _progress(t, span):
 
 
 def right_state(t):
-    """(drop, opacity) of the sheet's sigma > 0 half at film time t (S4 lowers it, S5 restores)."""
+    """(drop, opacity) of the sheet's sigma > 0 half at film time t: S4 lowers and fades it out;
+    S5 resets it to its height while hidden, then fades it back in in place."""
     if t < bt.S4_RIGHT_DROP[0] or t >= bt.S5_RIGHT_RESTORE[1]:
         return 0.0, 1.0
-    if t < bt.S5_RIGHT_RESTORE[0]:
+    if t < bt.SCENE_S5_START:
         a = _progress(t, bt.S4_RIGHT_DROP)
         return bt.RIGHT_DROP_DEPTH * a, 1.0 - a
-    a = _progress(t, bt.S5_RIGHT_RESTORE)
-    return bt.RIGHT_DROP_DEPTH * (1.0 - a), a
+    return 0.0, _progress(t, bt.S5_RIGHT_RESTORE)
 
 
 def sheet_at(t, R, zero=None):
@@ -208,7 +198,7 @@ def _project(state, pts):
 
 
 def pole_tops(R, lift):
-    return np.array([world.xyz(p.real, p.imag, (Z_CEIL + 0.3) * lift) for p in ph.poles(R) / 1e3])
+    return np.array([world.xyz(p.real, p.imag, TENT_TOP * lift) for p in ph.poles(R) / 1e3])
 
 
 def label_boxes(state, R, lift):
@@ -237,7 +227,7 @@ def frame_violations(state, t, R, zero=None):
     sheet = sheet_at(t, R, zero)
     if bt.PLANE_SPAN[0] <= t <= bt.PLANE_SPAN[1]:
         sheet = np.vstack([sheet, plane_points()])  # (checked as 3D content, like the sheet)
-    if lift > 0:  # the tent poles stand 0.3 above the sheet's ceiling: the highest 3D points
+    if lift > 0:  # the tent poles stand TENT_OVERSHOOT above the sheet's ceiling: the highest 3D points
         sheet = np.vstack([sheet, pole_tops(R, lift)])
     floor = floor_outline()
     pts = np.vstack([floor, sheet]) if len(sheet) else floor

@@ -25,7 +25,8 @@ SWAP = 0.05  # duration of an invisible handoff between identical mobjects
 
 # --- S5 (35.72-48.31): the sigma > 0 half returns while the camera goes back to ANALYSIS ---
 S5_JW_LABEL_OUT = (35.80, 36.30)
-S5_RIGHT_RESTORE = (36.00, 37.50)
+SCENE_S5_START = 35.72
+S5_RIGHT_RESTORE = (36.00, 37.50)  # the sigma > 0 half fades back in, in place
 S5_PROBE_TO_R = (36.20, 36.80)  # v_C -> v_R and numerator 1 -> RCs (CLAUDE.md: R during 36.2-46.6)
 S5_EDGE_LABEL_IN = (37.20, 37.50)  # 'from -inf' at the domain edge while the zero approaches
 S5_ZERO_SHOW = (37.85, 38.15)  # nail + floor ring appear as the zero reaches the edge (38.0)

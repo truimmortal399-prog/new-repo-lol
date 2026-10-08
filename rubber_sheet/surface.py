@@ -20,6 +20,8 @@ LIGHT = LIGHT / np.linalg.norm(LIGHT)
 AMBIENT = 0.58
 DIFFUSE = 0.42
 Z_CEIL = ph.zmap(np.inf)
+TENT_OVERSHOOT = 0.2  # tent poles poke this far (scene units, x lift) above the sheet's ceiling
+TENT_TOP = Z_CEIL + TENT_OVERSHOOT
 
 
 def warped_nodes(a, b, n_cells, centers, amp=10.0, width=0.9, samples=1601):
