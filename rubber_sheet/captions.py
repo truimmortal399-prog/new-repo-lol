@@ -345,11 +345,11 @@ class CaptionTrack:
                 if _max_opacity(m) < 0.02:
                     continue
                 if fixed:
-                    box = _bbox_fixed(m)
+                    box = _bbox(_leaf_points(m, visible_only=True))
                     if not annotation:
                         hud.append((name, box))
                 else:
-                    pts = _projected_points(self.scene.camera, m)
+                    pts = _projected_points(self.scene.camera, m, visible_only=True)
                     world_pts.append((name, pts))
                     box = _bbox(pts)
                 for other, obox in boxes:
@@ -387,6 +387,8 @@ class CaptionTrack:
             self.strays[key][1] = round(t, 3)
 
     def write_log(self, path=None):
+        if os.environ.get("RS_NO_LOG"):  # partial renders (tools/still.py) must not overwrite the log
+            return None
         path = path or os.path.join("out", "captions", f"{self.scene_id}.json")
         os.makedirs(os.path.dirname(path), exist_ok=True)
         entries = []
@@ -410,19 +412,55 @@ class CaptionTrack:
         return path
 
 
+def expected_visible(line, scene_id, fps):
+    """(first, last) film times at which `line` must be visible in a render at `fps`: the first
+    frame strictly after its reveal starts and the last strictly before its exit ends, on the
+    film's frame grid. A reveal before the grid start is clamped onto the scene's first frame and
+    the whole caption moves with it (CaptionTrack.clips)."""
+    import math
+
+    t0 = sc.scene_start_on_grid(scene_id, fps)
+    shift = max(t0 - line.reveal, 0.0)
+    reveal, exit_end = line.reveal + shift, line.exit_end + shift
+    first = t0 + (math.floor((reveal - t0) * fps + 1e-6) + 1) / fps
+    last = t0 + (math.ceil((exit_end - t0) * fps - 1e-6) - 1) / fps
+    return first, last
+
+
+def timing_problems(line, scene_id, fps, first_visible, last_visible):
+    """Reading-time / frame-grid problems of one caption's observed visibility (empty = OK)."""
+    frame = 1.0 / fps
+    if first_visible is None:
+        return ["never visible"]
+    exp_first, exp_last = expected_visible(line, scene_id, fps)
+    out = []
+    if abs(first_visible - exp_first) > 0.5 * frame:
+        out.append(f"first visible {first_visible:.3f}, expected {exp_first:.3f}")
+    if abs(last_visible - exp_last) > 0.5 * frame:
+        out.append(f"last visible {last_visible:.3f}, expected {exp_last:.3f}")
+    if last_visible - first_visible < line.hold + sc.REVEAL - frame:
+        out.append("on screen shorter than reveal + hold")
+    return out
+
+
 def _max_opacity(mob):
     ops = [m.get_fill_opacity() for m in mob.get_family() if m.has_points()]
     ops += [m.get_stroke_opacity() for m in mob.get_family() if m.has_points() and m.get_stroke_width() > 0]
     return max(ops, default=0.0)
 
 
-def _leaf_points(mob):
+def _leaf_visible(m):
+    return max(m.get_fill_opacity(), m.get_stroke_opacity() if m.get_stroke_width() > 0 else 0.0) >= 0.02
+
+
+def _leaf_points(mob, visible_only=False):
     """All points of a mobject's family in one concatenate (Mobject.get_all_points builds the
     array with repeated np.append: ~200 ms for the 4704-face sheet). LiveSurface supplies its
-    own small outline instead."""
+    own small outline instead. visible_only: skip leaves that are not drawn (e.g. a panel tick
+    parked outside the box at opacity 0)."""
     if hasattr(mob, "outline_points"):
         return mob.outline_points()
-    leaves = [m.points for m in mob.get_family() if m.has_points()]
+    leaves = [m.points for m in mob.get_family() if m.has_points() and (not visible_only or _leaf_visible(m))]
     return np.concatenate(leaves) if leaves else np.zeros((0, 3))
 
 
@@ -436,8 +474,8 @@ def _bbox_fixed(mob):
     return _bbox(_leaf_points(mob))
 
 
-def _projected_points(camera, mob):
-    pts = _leaf_points(mob)
+def _projected_points(camera, mob, visible_only=False):
+    pts = _leaf_points(mob, visible_only)
     if len(pts) and hasattr(camera, "screen_points"):
         pts = camera.screen_points(pts)  # fresh rotation (project_points is a frame stale here)
     elif len(pts) and hasattr(camera, "project_points"):

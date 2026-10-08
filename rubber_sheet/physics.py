@@ -70,6 +70,24 @@ def mag_zero(s, R, z):
         return np.abs(rc * (z - s)) / (np.abs(rc * z - 1.0) * np.abs(denominator(s, R)))
 
 
+ZERO_EDGE = -15e3  # rad/s: the left edge of the s-plane domain (sigma = -15 krad/s)
+
+
+def zero_slide(u):
+    """Hand-moved zero position (rad/s) for the S5 beat parameter u in [0, 2].
+
+    u in [0, 1]: z = ZERO_EDGE / u, i.e. b = -1/z grows linearly from 0 (z = -inf: exactly H_C)
+    to the domain edge, so the zero arrives from -inf. u in [1, 2]: z moves linearly from the edge
+    to 0 (exactly H_R at u = 2). Not a physical parameter: disclosed on screen as hand-moved.
+    """
+    u = float(u)
+    if u <= 0.0:
+        return -np.inf
+    if u <= 1.0:
+        return ZERO_EDGE / u
+    return ZERO_EDGE * (2.0 - min(u, 2.0))
+
+
 def to_db(mag):
     with np.errstate(divide="ignore"):
         return 20.0 * np.log10(mag)

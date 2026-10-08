@@ -17,7 +17,9 @@ HOLDS = [("TOP", 11.6, 15.0, cam.TOP), ("S3_END", 21.0, 25.4, cam.S3_END), ("CUT
 
 
 def zeros_at(t):
-    return [None, -15.0, -5.0, 0.0] if bt.ZERO_BEAT[0] <= t <= bt.ZERO_BEAT[1] else [None]
+    """The hand-moved zero as scheduled (S5), plus no zero: the zero may be faded out early."""
+    z = L.zero_at(t)
+    return [None] if z is None else [None, z]
 
 
 def violations(state, t):
@@ -32,7 +34,7 @@ def violations(state, t):
 @pytest.mark.parametrize("move", cam.MOVES, ids=lambda m: m.name)
 def test_every_move_is_framed(move):
     bad = []
-    for t, state in L.states_along(move, 40):
+    for t, state in L.states_along(move, 120):  # dense: grazing hits between samples were real (Gate 4)
         bad += violations(state, t)
     assert not bad, bad[:5]
 

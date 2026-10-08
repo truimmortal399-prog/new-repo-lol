@@ -48,3 +48,20 @@ def test_caption_clips_build_at_every_fps(scene, fps):
             assert reveal >= 0.0
         for line, (reveal, _), (exit_start, _) in zip(sc.lines_for(scene), clips[::2], clips[1::2]):
             assert exit_start - reveal >= sc.REVEAL + line.hold - 1e-6
+
+
+def test_group_clock_is_scene_time_when_a_clip_ends_past_the_last_frame():
+    """S4: C8's exit ends on the cut (35.72), one frame after the grid's last frame. The group clock
+    must still equal scene time, or every clip starts early."""
+    from manim import Wait, tempconfig
+
+    from rubber_sheet.timeline import Timeline
+
+    with tempconfig({"frame_rate": 15}):
+        tl = Timeline("S4", 15)
+        end = sc.SCENES["S4"][1] - tl.t0
+        assert end > tl.duration  # the situation under test
+        tl.extend([(4.4, Wait(0.5)), (end - 0.4, Wait(0.4))])
+        group = tl.build()  # max_end_time is set at construction
+        for t in (0.0, 4.4, 7.0, tl.duration):
+            assert group.rate_func(t / tl.duration) * group.max_end_time == pytest.approx(t, abs=1e-12)

@@ -13,6 +13,8 @@ Mechanics (Manim CE 0.22, verified):
   during camera moves and lose depth order between static and moving mobjects).
 """
 
+import os
+
 from manim import AnimationGroup, Group, Succession, VectorizedPoint, Wait, config
 from manim.animation.animation import Animation, prepare_animation
 
@@ -70,7 +72,10 @@ class Timeline:
             self.clips.append((local, prepare_animation(anim)))
         return self
 
-    def build(self):
+    def build(self, run_time=None):
+        """run_time: play only the first run_time seconds (still frames, RS_STILL_AT); clips keep
+        their scene-time positions."""
+        run_time = self.duration if run_time is None else run_time
         parts = []
         for local, anim in self.clips:
             end = local + anim.get_run_time()
@@ -84,11 +89,27 @@ class Timeline:
             steps.append(anim)
             parts.append(Succession(*steps))
         parts.append(Wait(self.duration))
-        return AnimationGroup(*parts, group=Group(), run_time=self.duration)
+        # AnimationGroup runs its clock as rate_func(alpha) * (latest clip end). A clip may end up to
+        # one frame after the last rendered frame (above), which would make that clock run fast by
+        # the ratio and start every clip early (S4: C8's exit ends on the cut, 8 ms drift by 29.4).
+        # This rate function pins the group clock to scene time exactly.
+        latest = max(local + anim.get_run_time() for local, anim in self.clips) if self.clips else 0.0
+        scale = run_time / max(self.duration, latest)
+        return AnimationGroup(*parts, group=Group(), run_time=run_time, rate_func=lambda a: a * scale)
 
     def play(self, scene):
         driver = VectorizedPoint()
         driver.add_updater(lambda m, dt: None)
         scene.add(driver)
         scene.bring_to_back(driver)
-        scene.play(self.build())
+        # RS_STILL_AT=<film time> (tools/still.py): run every frame up to that time but draw only the
+        # last one, so the movie holds exactly that frame. (manim -s cannot do this: it skips to
+        # the end of the play and finishes every clip.)
+        still = os.environ.get("RS_STILL_AT")
+        if still is None:
+            scene.play(self.build())
+            return
+        local = round((float(still) - self.t0) * self.fps) / self.fps
+        draw = scene.renderer.render
+        scene.renderer.render = lambda sc, t, moving: draw(sc, t, moving) if t >= local - 0.25 / self.fps else None
+        scene.play(self.build(local + 0.5 / self.fps))

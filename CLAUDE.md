@@ -75,6 +75,16 @@ Stop and report at each gate. Never start S1/S2/S4–S7 before Gates 2 and 3 are
   Rules live in `layout.frame_violations`; camera moves carry framing keyframes (`Move.via`,
   monotone cubic) — search them with tools/frame_search.py rather than shrinking the zoom.
 - The height tag never moves or fades during camera moves; the camera paths keep the sheet clear.
+- Tent-pole tops (ceiling + 0.3) are the highest 3D points and are part of the framing rules.
+- Timeline: AnimationGroup runs its clock as rate(alpha) * latest clip end; Timeline pins it to
+  scene time (a clip may end one frame after the last frame — S4's C8 exit did, 8 ms drift).
+- Inside the one-play Timeline a FadeOut leaves its mobject faded (opacity 0) until the scene's
+  play ends (clean-up runs then). Never FadeIn the same mobject later: fade in a registered copy.
+- Interpenetrating 3D primitives defeat the painter's order (staircase teeth): split them at the
+  intersection (SigmaPlane: part under the sheet = UNDER_SHEET bias, part above sorts normally).
+- Inspect any moment at final mesh: `.venv/bin/python tools/still.py S4 25.6 [more times]` (RS_STILL_AT).
+- Every built scene is played by tests/test_scenes_monitor.py (overlap, strays, caption frames):
+  add new scenes there and to tools/keyframes.py SCENE_FILES.
 
 ## Quality bar
 No caption/visual overlap (automated), no caption shorter than its reading time (automated),

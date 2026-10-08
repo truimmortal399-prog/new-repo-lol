@@ -21,6 +21,8 @@ from rubber_sheet import script as sc  # noqa: E402
 
 EXTRA = {
     "S3": [12.4, 13.4, 13.9, 14.5, 15.6, 17.0, 18.0, 18.6, 19.4, 20.6, 21.0, 22.8, 24.9],
+    "S4": [25.2, 25.6, 26.3, 26.8, 27.5, 28.2, 29.2, 30.25, 30.35, 30.8, 31.2, 31.6, 31.9, 33.6, 34.2, 34.8, 35.6],
+    "S5": [36.0, 36.5, 37.0, 37.4, 37.8, 38.1, 38.6, 39.4, 40.2, 41.0, 42.5, 43.9, 44.8, 45.9, 46.3, 46.7, 47.1, 47.6, 48.2],
 }
 FONT = "/usr/share/fonts/opentype/inter/Inter-SemiBold.otf"
 
@@ -57,6 +59,8 @@ def contact_sheet(paths, labels, out, cols=4, width=480):
 
 SCENE_FILES = {
     "S3": ("s03_poles_sheet", "S3PolesSheet"),
+    "S4": ("s04_slice_bode", "S4SliceBode"),
+    "S5": ("s05_zero_nail", "S5ZeroNail"),
 }
 
 

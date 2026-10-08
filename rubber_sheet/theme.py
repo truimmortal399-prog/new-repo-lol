@@ -25,6 +25,10 @@ ROLE_COLORS = {"POLE": POLE, "ZERO": ZERO, "SIGNAL": SIGNAL}
 SURFACE_STOPS = [(0.0, "#1A2340"), (0.55, "#5B6BC0"), (1.0, "#C9CFF5")]
 SURFACE_OPACITY = 0.92
 SURFACE_STROKE_WIDTH = 0.6  # same colour as the face: seam hiding, not mesh lines
+SIGNAL_WIDTH = 3.5  # the measured curve: jw cut on the sheet, Bode curve (same width: seamless handoff)
+PLANE_FILL_OPACITY = 0.16  # the gold sigma = 0 "knife" plane in S4
+PLANE_EDGE_OPACITY = 0.75
+PLANE_EDGE_WIDTH = 2.0
 
 # --- type ---------------------------------------------------------------------------
 FONT_BODY = "Inter"

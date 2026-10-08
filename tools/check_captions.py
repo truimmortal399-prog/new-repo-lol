@@ -7,11 +7,11 @@ Exit status 1 on any failure.
 
 import argparse
 import json
-import math
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from rubber_sheet import captions  # noqa: E402
 from rubber_sheet import script as sc  # noqa: E402
 from rubber_sheet import theme as th  # noqa: E402
 
@@ -22,29 +22,11 @@ def main():
     ap.add_argument("--fps", type=float, default=15.0)
     args = ap.parse_args()
     fps = args.fps
-    frame = 1.0 / fps
     log = json.load(open(os.path.join("out", "captions", f"{args.scene}.json")))
-    t0 = sc.scene_start_on_grid(args.scene, fps)
     ok = True
     for c in log["captions"]:
         line = sc.BY_ID[c["id"]]
-        # Same placement as CaptionTrack.clips: a reveal before the grid start is clamped onto
-        # the scene's first frame and the whole caption moves with it.
-        shift = max(t0 - line.reveal, 0.0)
-        reveal, exit_end = line.reveal + shift, line.exit_end + shift
-        # first frame strictly after the reveal starts; last frame strictly before the exit ends
-        exp_first = t0 + (math.floor((reveal - t0) * fps + 1e-6) + 1) / fps
-        exp_last = t0 + (math.ceil((exit_end - t0) * fps - 1e-6) - 1) / fps
-        problems = []
-        if c["first_visible"] is None:
-            problems.append("never visible")
-        else:
-            if abs(c["first_visible"] - exp_first) > 0.5 * frame:
-                problems.append(f"first visible {c['first_visible']:.3f}, expected {exp_first:.3f}")
-            if abs(c["last_visible"] - exp_last) > 0.5 * frame:
-                problems.append(f"last visible {c['last_visible']:.3f}, expected {exp_last:.3f}")
-            if c["last_visible"] - c["first_visible"] < line.hold + sc.REVEAL - frame:
-                problems.append("on screen shorter than reveal + hold")
+        problems = captions.timing_problems(line, args.scene, fps, c["first_visible"], c["last_visible"])
         xh = c.get("x_height")
         if xh is not None and xh < th.MIN_CAPTION_XHEIGHT:
             problems.append(f"x-height {xh:.4f} < {th.MIN_CAPTION_XHEIGHT}")

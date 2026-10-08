@@ -33,8 +33,8 @@ SHEET_PIVOT = (-1.25, 0.0, 1.6)  # middle of the sheet volume
 
 TOP = CamState(phi=0.0, theta=-90.0, zoom=0.82, pivot=SHEET_CENTER, pan=(1.1, 0.475))  # looks 2D
 S3_END = CamState(phi=58.0, theta=-50.0, zoom=0.74, pivot=SHEET_PIVOT, pan=(0.7, 0.76))
-CUT = CamState(phi=82.0, theta=0.0, zoom=0.78, pivot=SHEET_PIVOT, pan=(-3.0, -0.6))  # jw cut reads as a 2D profile
-ANALYSIS = CamState(phi=60.0, theta=-40.0, zoom=0.66, pivot=SHEET_PIVOT, pan=(-1.9, 0.1))
+CUT = CamState(phi=82.0, theta=0.0, zoom=0.78, pivot=SHEET_PIVOT, pan=(-3.0, -0.88))  # jw cut reads as a 2D profile
+ANALYSIS = CamState(phi=64.0, theta=-40.0, zoom=0.64, pivot=SHEET_PIVOT, pan=(-2.0, -0.1))
 HERO = CamState(phi=62.0, theta=-60.0, zoom=0.76, pivot=SHEET_PIVOT, pan=(0.0, 0.8))
 
 
@@ -90,15 +90,20 @@ MOVES = [
         "S4 swing to CUT", "S4", 25.4, 30.2, S3_END, CUT,
         # the sheet's far end sweeps through the top-left mid-swing: these keep it clear of the
         # formula and height tag (the tag stays put) with a smooth pan (tools/frame_search.py)
+        # (re-searched at Gate 4 with the gold plane and the tent-pole tops in the rules)
         via=(
-            Frame(s=0.4, zoom=0.72, pivot=(-1.25, 0.0, 1.6), pan=(-0.18, 0.016)),
-            Frame(s=0.75, zoom=0.70, pivot=(-1.25, 0.0, 1.6), pan=(-1.675, -0.66)),
+            Frame(s=0.45, zoom=0.68, pivot=(-1.25, 0.0, 1.6), pan=(-0.425, -0.278)),
+            Frame(s=0.7, zoom=0.68, pivot=(-1.25, 0.0, 1.6), pan=(-1.52, -0.678)),
         ),
     ),
     Move(
         "S5 return to ANALYSIS", "S5", 35.72, 39.92, CUT, ANALYSIS,
-        # keeps the sheet (incl. the raised far corners of the zero beat) clear of the height tag
-        via=(Frame(s=0.35, zoom=0.72, pivot=(-1.25, 0.0, 1.6), pan=(-2.6, -0.4)),),
+        # keeps the sheet (incl. the zero beat's raised far corners and the R = 120 tent-pole tops)
+        # clear of the height tag and the floor out of the band (tools/frame_search.py, Gate 4)
+        via=(
+            Frame(s=0.45, zoom=0.70, pivot=(-1.25, 0.0, 1.6), pan=(-2.35, -0.529)),
+            Frame(s=0.75, zoom=0.66, pivot=(-1.25, 0.0, 1.6), pan=(-2.05, -0.295)),
+        ),
     ),
 ]
 

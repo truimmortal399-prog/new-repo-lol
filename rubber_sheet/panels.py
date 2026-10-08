@@ -6,7 +6,7 @@ registration; objects rebuilt by always_redraw would not be in it).
 """
 
 import numpy as np
-from manim import LEFT, RIGHT, UP, Line, MarkupText, Rectangle, Text, VGroup, VMobject
+from manim import LEFT, RIGHT, UP, Line, MarkupText, Rectangle, Text, ValueTracker, VGroup, VMobject
 
 from rubber_sheet import physics as ph
 from rubber_sheet import theme as th
@@ -39,15 +39,42 @@ def _dashes(xy, dash, gap):
 
 
 class Panel(VGroup):
-    """Axes box with data->screen transform."""
+    """Axes box with data->screen transform.
+
+    opacity: display-only ValueTracker for fading the whole panel. Panels update every frame, and
+    FadeIn/FadeOut would suspend that updater, so scenes animate this tracker instead. Each leaf
+    keeps its own design opacity times the tracker value (static leaves are re-applied only when
+    the tracker changes; data curves and moving ticks every frame).
+    """
 
     def __init__(self, x0, x1, y0, y1, xlim, ylim):
         super().__init__()
         self.box = (x0, x1, y0, y1)
         self.xlim, self.ylim = xlim, ylim
+        self.opacity = ValueTracker(1.0)
+        self._static = []
+        self._applied = None
         self.frame_rect = Rectangle(width=x1 - x0, height=y1 - y0).move_to([(x0 + x1) / 2, (y0 + y1) / 2, 0])
         self.frame_rect.set_stroke(th.FAINT, width=1.5).set_fill(th.BG, opacity=0.85)
         self.add(self.frame_rect)
+
+    def dynamic(self):
+        """Roots whose opacity refresh() sets itself every frame."""
+        return []
+
+    def freeze_design_opacities(self):
+        """Record every static leaf's design opacities (end of a subclass __init__)."""
+        skip = {m for root in self.dynamic() for m in root.get_family()}
+        self._static = [(m, m.get_fill_opacity(), m.get_stroke_opacity()) for m in self.get_family() if m.has_points() and m not in skip]
+
+    def apply_opacity(self):
+        op = self.opacity.get_value()
+        if op != self._applied:
+            for m, f, s in self._static:
+                m.set_fill(opacity=f * op, family=False)
+                m.set_stroke(opacity=s * op, family=False)
+            self._applied = op
+        return op
 
     def to_screen(self, u, v):
         x0, x1, y0, y1 = self.box
@@ -96,30 +123,47 @@ class BodePanel(Panel):
         for db, txt in ((40, "+40"), (0, "0"), (-40, "−40")):
             t = self.label(txt).next_to(self.to_screen([0.0], [db])[0].tolist() + [0], LEFT, buff=0.08)
             self.ticks.add(t)
-        self.decade_lines = VGroup(*[Line(), Line(), Line()])
+        # Frequency ticks: decades 1/10/100 krad/s stay (they slide into place during the warp);
+        # 5 and 15 krad/s label the linear axis only and fade out as the warp proceeds.
+        self.decade_w = (1e3, 1e4, 1e5)
+        self.lin_w = (5e3, 15e3)
+        self.decade_lines = VGroup(*[Line() for _ in self.decade_w])
         self.decade_labels = VGroup(*[self.label(s) for s in ("1", "10", "100")])
-        self.add(self.ticks, self.decade_lines, self.decade_labels)
+        self.lin_lines = VGroup(*[Line() for _ in self.lin_w])
+        self.lin_labels = VGroup(*[self.label(s) for s in ("5", "15")])
+        self.add(self.ticks, self.decade_lines, self.lin_lines, self.decade_labels, self.lin_labels)
         self.title = MarkupText("|<i>H</i>(<i>jω</i>)|  dB", font=th.FONT_BODY, font_size=th.SIZE_LABEL, color=th.FG)
         self.title.next_to(self.frame_rect, UP, buff=0.08, aligned_edge=LEFT)
         self.xtitle = self.label("ω  (krad/s)", size=th.SIZE_SMALL)
         self.xtitle.move_to([x1, y0 - th.PANEL_AXIS_TITLE_ROW, 0], aligned_edge=RIGHT)
         self.add(self.title, self.xtitle)
-        self.curve = VMobject().set_stroke(th.SIGNAL, width=3.5)
+        self.curve = VMobject().set_stroke(th.SIGNAL, width=th.SIGNAL_WIDTH)
+        self.curve_opacity = ValueTracker(1.0)  # display-only: hidden until the S4 handoff lands
         self.add(self.curve)
+        self.freeze_design_opacities()
         self.refresh()
         self.add_updater(lambda m: m.refresh())
+
+    def dynamic(self):
+        return [self.curve, self.decade_lines, self.decade_labels, self.lin_lines, self.lin_labels]
 
     def mu(self):
         return 1.0 if self.warp is None else float(self.warp.get_value())
 
-    def x_of_w(self, w):
+    def x_of_w(self, w, mu=None):
         """rad/s -> normalized panel x in [0, 1] (blend of linear and log axis)."""
         w = np.asarray(w, dtype=float)
         lin = (w / KRAD - self.LIN[0]) / (self.LIN[1] - self.LIN[0])
         with np.errstate(divide="ignore"):
             log = (np.log10(np.maximum(w, 1e-9)) - self.LOG[0]) / (self.LOG[1] - self.LOG[0])
-        m = self.mu()
+        m = self.mu() if mu is None else mu
         return (1 - m) * lin + m * log
+
+    def screen_curve(self, w, mu):
+        """Screen points (n, 2) of the curve at the given frequencies (rad/s) for warp mu, without
+        clipping to the box in x (used to build the S4 handoff target)."""
+        db = np.clip(ph.to_db(self.mag_fn(np.asarray(w, dtype=float))), *self.DB)
+        return self.to_screen(self.x_of_w(w, mu), db)
 
     def data(self):
         """Visible samples: (w rad/s, dB exact) inside the box."""
@@ -129,17 +173,22 @@ class BodePanel(Panel):
         return self.w[keep], db[keep], x[keep]
 
     def refresh(self):
+        op = self.apply_opacity()
         w, db, x = self.data()
         y = np.clip(db, self.DB[0], self.DB[1])
         self.curve.points = _straight_cubics(self.to_screen(x, y))
-        for k, (line, lab, wd) in enumerate(zip(self.decade_lines, self.decade_labels, (1e3, 1e4, 1e5))):
+        self.curve.set_stroke(opacity=op * self.curve_opacity.get_value(), family=False)
+        mu = self.mu()
+        ticks = [(l, t, wd, 1.0) for l, t, wd in zip(self.decade_lines, self.decade_labels, self.decade_w)]
+        ticks += [(l, t, wd, 1.0 - mu) for l, t, wd in zip(self.lin_lines, self.lin_labels, self.lin_w)]
+        for line, lab, wd, fade in ticks:
             xd = float(self.x_of_w(wd))
-            vis = 0.0 <= xd <= 1.0
+            vis = fade * op if 0.0 <= xd <= 1.0 + 1e-9 else 0.0
             p = self.to_screen([xd, xd], [self.DB[0], self.DB[1]])
             line.points = _straight_cubics(p)
-            line.set_stroke(th.FAINT, width=1.0, opacity=0.5 if vis else 0.0)
+            line.set_stroke(th.FAINT, width=1.0, opacity=0.5 * vis)
             lab.move_to([p[0, 0], self.box[2] - th.PANEL_TICK_ROW, 0])
-            lab.set_opacity(1.0 if vis else 0.0)
+            lab.set_opacity(vis)
         return self
 
 
@@ -165,6 +214,7 @@ class ImpulsePanel(Panel):
         self.envelope = VMobject().set_stroke(th.POLE, width=2.0, opacity=0.85)
         self.curve = VMobject().set_stroke(th.SIGNAL, width=2.5)
         self.add(self.tick_labels, self.title, self.xtitle, self.envelope, self.curve)
+        self.freeze_design_opacities()
         self.refresh()
         self.add_updater(lambda m: m.refresh())
 
@@ -175,6 +225,7 @@ class ImpulsePanel(Panel):
         return self.t * 1e3, h, env
 
     def refresh(self):
+        self.apply_opacity()  # curve and envelope are plain static-style leaves (points change only)
         t_ms, h, env = self.data()
         self.curve.points = _straight_cubics(self.to_screen(t_ms, np.clip(h, *self.Y)))
         up = self.to_screen(t_ms, np.clip(env, *self.Y))
@@ -193,8 +244,11 @@ class Readout(VGroup):
 
     GLYPHS = "0123456789.−+∞"
 
-    def __init__(self, label_markup, value_fn, fmt, unit="", size=th.SIZE_LABEL, color=th.FG, n_slots=6, align="right"):
+    def __init__(self, label_markup, value_fn, fmt, unit="", size=th.SIZE_LABEL, color=th.FG, n_slots=6, align="right", opacity=None):
         super().__init__()
+        # opacity: optional display-only ValueTracker (a FadeIn would suspend the value updater)
+        self.opacity = opacity
+        self._op = None
         # align="right": fixed-width field, decimal point never moves (blank cells when short).
         # align="left": the number starts right after the label (no gap; stacked readouts keep
         # their '=' signs in one column); it shifts only when its digit count changes (e.g. R
@@ -245,6 +299,11 @@ class Readout(VGroup):
         return self.fmt.format(value).replace("-", "−")
 
     def refresh(self):
+        if self.opacity is not None and self.opacity.get_value() != self._op:
+            self._op = self.opacity.get_value()
+            self.label.set_opacity(self._op)
+            self.unit.set_opacity(self._op)
+            self.slots.set_fill(opacity=self._op)
         raw = self.format(self.value_fn())
         if len(raw) > len(self.slots):
             raise ValueError(f"readout overflow: {raw!r} needs more than {len(self.slots)} slots")

@@ -15,7 +15,6 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np  # noqa: E402
 
-from rubber_sheet import beats as bt  # noqa: E402
 from rubber_sheet import camera as cam  # noqa: E402
 from rubber_sheet import layout as L  # noqa: E402
 
@@ -23,10 +22,12 @@ RS = (120.0, 4.0, 0.0)
 
 
 def zeros_at(t):
-    return [None, -15.0, -5.0, 0.0] if bt.ZERO_BEAT[0] <= t <= bt.ZERO_BEAT[1] else [None]
+    """The hand-moved zero as scheduled (S5), plus no zero: the zero may be faded out early."""
+    z = L.zero_at(t)
+    return [None] if z is None else [None, z]
 
 
-def feasible(move, n=24):
+def feasible(move, n=48):  # at least the test's sampling (tests/test_composition.py: 40)
     for t, st in L.states_along(move, n):
         for R in RS:
             for z in zeros_at(t):
