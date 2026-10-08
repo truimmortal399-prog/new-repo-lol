@@ -1,11 +1,16 @@
 """Extract review keyframes from a rendered scene and build a labeled contact sheet.
 
-Times: scene start/end, every caption's mid-hold, and the beat times listed in EXTRA.
-  .venv/bin/python tools/keyframes.py S3 media/videos/s03_poles_sheet/480p15/S3PolesSheet.mp4
+Times: scene start/end, every caption's mid-hold, the beat times in EXTRA, plus any extra
+times given on the command line. The output folder is cleared first, so a contact sheet never
+mixes renders.
+  .venv/bin/python tools/keyframes.py S3                 # newest render of S3 (any quality)
+  .venv/bin/python tools/keyframes.py S3 path/to/video.mp4 [extra film times ...]
 Writes out/keys/<scene>/<film-time>.png and out/keys/<scene>/contact.png.
 """
 
+import glob
 import os
+import shutil
 import subprocess
 import sys
 
@@ -50,11 +55,28 @@ def contact_sheet(paths, labels, out, cols=4, width=480):
     sheet.save(out)
 
 
-def main(scene_id, video, times=None):
-    t0 = sc.SCENES[scene_id][0]
+SCENE_FILES = {
+    "S3": ("s03_poles_sheet", "S3PolesSheet"),
+}
+
+
+def newest_video(scene_id):
+    module, cls = SCENE_FILES[scene_id]
+    found = glob.glob(os.path.join("media", "videos", module, "*", f"{cls}.mp4"))
+    if not found:
+        raise SystemExit(f"no render of {scene_id} under media/videos/{module}/")
+    return max(found, key=os.path.getmtime)
+
+
+def main(scene_id, video, extra=()):
     outdir = os.path.join("out", "keys", scene_id)
-    os.makedirs(outdir, exist_ok=True)
-    times = times or keyframe_times(scene_id)
+    shutil.rmtree(outdir, ignore_errors=True)
+    os.makedirs(outdir)
+    fps = float(subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0", video],
+        capture_output=True, text=True, check=True).stdout.strip().split("/")[0])
+    t0 = sc.scene_start_on_grid(scene_id, fps)  # the video's first frame shows this film time
+    times = sorted(set(keyframe_times(scene_id)) | set(extra))
     paths, labels = [], []
     for t in times:
         p = os.path.join(outdir, f"{t:06.2f}.png")
@@ -63,9 +85,10 @@ def main(scene_id, video, times=None):
         cap = [l.id for l in sc.lines_for(scene_id) if l.reveal <= t <= l.exit_end]
         labels.append(f"t = {t:.2f} s  {' '.join(cap)}")
     contact_sheet(paths, labels, os.path.join(outdir, "contact.png"))
-    print(os.path.join(outdir, "contact.png"), len(paths), "frames")
+    print(os.path.join(outdir, "contact.png"), len(paths), "frames from", video)
 
 
 if __name__ == "__main__":
-    extra = [float(x) for x in sys.argv[3:]] or None
-    main(sys.argv[1], sys.argv[2], extra)
+    scene = sys.argv[1]
+    video = sys.argv[2] if len(sys.argv) > 2 else newest_video(scene)
+    main(scene, video, [float(x) for x in sys.argv[3:]])

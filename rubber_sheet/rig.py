@@ -9,7 +9,7 @@ on screen without touching fixed-in-frame mobjects.
 """
 
 import numpy as np
-from manim import DEGREES, ThreeDCamera, ValueTracker
+from manim import DEGREES, Camera, ThreeDCamera, ValueTracker
 from manim.utils.family import extract_mobject_family_members
 
 from rubber_sheet import camera as cam
@@ -52,6 +52,33 @@ class RigCamera(ThreeDCamera):
 
     def pivot(self):
         return self._frame_center.points[0]
+
+    def eye(self):
+        """World position of the eye (perspective centre)."""
+        rot = self.get_rotation_matrix()
+        return self.pivot() + rot.T @ np.array([0.0, 0.0, self.get_focal_distance()])
+
+    def get_mobjects_to_display(self, *args, **kwargs):
+        """Painter's order for a height field seen from above.
+
+        Stock ThreeDCamera sorts by each leaf's bbox-centre view depth, which mis-sorts the steep
+        faces at the pole spikes (4-114 back-face pixels at 1080p, Gate 2 probe). Here 3D leaves
+        are drawn far-to-near by HORIZONTAL distance from the eye (0 back-face pixels), with:
+          depth_layer -1  floor objects (always first: the camera is always above the floor)
+          depth_bias      per-object offset inside its layer (e.g. tent pole below/above sheet)
+        Leaves without shade_in_3d (text, fixed overlays) keep +inf: drawn last, in scene order.
+        """
+        mobs = Camera.get_mobjects_to_display(self, *args, **kwargs)
+        eye = self.eye()
+        keys = np.empty(len(mobs))
+        for i, m in enumerate(mobs):
+            if not getattr(m, "shade_in_3d", False):
+                keys[i] = np.inf
+                continue
+            ref = m.zref if hasattr(m, "zref") else m.get_center()
+            dist = np.hypot(ref[0] - eye[0], ref[1] - eye[1])
+            keys[i] = getattr(m, "depth_layer", 0) * 1e6 - dist + getattr(m, "depth_bias", 0.0)
+        return [mobs[i] for i in np.argsort(keys, kind="stable")]
 
     def project_points(self, points):
         focal_distance = self.get_focal_distance()

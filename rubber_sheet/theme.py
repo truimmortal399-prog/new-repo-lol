@@ -24,8 +24,7 @@ ROLE_COLORS = {"POLE": POLE, "ZERO": ZERO, "SIGNAL": SIGNAL}
 # Surface colormap by display height (0 = floor .. 1 = ceiling): desaturated indigo ramp.
 SURFACE_STOPS = [(0.0, "#1A2340"), (0.55, "#5B6BC0"), (1.0, "#C9CFF5")]
 SURFACE_OPACITY = 0.92
-SURFACE_STROKE_OPACITY = 0.15
-SURFACE_STROKE_WIDTH = 0.4
+SURFACE_STROKE_WIDTH = 0.6  # same colour as the face: seam hiding, not mesh lines
 
 # --- type ---------------------------------------------------------------------------
 FONT_BODY = "Inter"
@@ -48,6 +47,7 @@ MIN_LABEL_XHEIGHT = 0.013
 ENTER = rate_functions.ease_out_cubic
 EXIT = rate_functions.ease_in_cubic
 SWEEP = rate_functions.smooth
+LINEAR = rate_functions.linear  # data clocks / constant-rate drifts only
 camera_rate = _camera.trapezoid  # camera_rate(run_time) -> rate function
 
 CAPTION_REVEAL = 0.8
@@ -56,6 +56,8 @@ CAPTION_LAG = 0.12
 CAPTION_SHIFT_IN = 0.08
 CAPTION_SHIFT_OUT = 0.06
 UNDERLINE_TIME = 0.25
+UNDERLINE_WIDTH = 2.5
+UNDERLINE_OPACITY = 0.6
 
 # --- layout (scene units; frame is 14.222 x 8) ------------------------------------------
 FRAME_W = config.frame_width
@@ -64,9 +66,16 @@ SAFE_MARGIN = 0.05
 CAPTION_BAND = dict(x0=-6.4, x1=6.4, y0=-3.80, y1=-2.70)
 CAPTION_CENTER_Y = -3.25
 TITLE_REGION = dict(x0=-6.4, x1=6.4, y0=1.6, y1=3.6)
-PANEL_REGION = dict(x0=1.9, x1=6.75, y0=-2.55, y1=3.75)
-BODE_BOX = (2.45, 6.6, 1.15, 3.3)  # (x0, x1, y0, y1) frame units
-IMPULSE_BOX = (2.45, 6.6, -1.85, 0.25)
+PANEL_REGION = dict(x0=1.9, x1=6.4, y0=-2.55, y1=3.6)
+# Panel boxes (x0, x1, y0, y1), frame units. Titles sit above, tick rows 0.16 below and axis
+# titles 0.42 below a box; everything stays inside title-safe (|x| <= 6.4, |y| <= 3.6) and above
+# the caption band (tests/test_layout.py).
+BODE_BOX = (2.45, 6.15, 1.35, 3.12)
+IMPULSE_BOX = (2.45, 6.15, -1.95, -0.05)
+PANEL_TICK_ROW = 0.16
+PANEL_AXIS_TITLE_ROW = 0.42
+SAFE_X = 6.4
+SAFE_Y = 3.6
 SCRIM_STEPS = 12
 SCRIM_MAX_OPACITY = 0.75
 SCRIM_TOP = -2.45  # scrim fades in from here down to the frame bottom
@@ -88,6 +97,8 @@ _PRESETS = {
     "final": dict(sigma_nodes=(42, 14), omega_half=42, cut_samples=600, curve_samples=1500),  # 4704
 }
 PRESET = _PRESETS[QUALITY]
+# Overlap/stray monitor runs every Nth frame (it is a check, not part of the picture).
+MONITOR_EVERY = {"preview": 1, "review": 2, "final": 4}[QUALITY]
 
 
 def configure():

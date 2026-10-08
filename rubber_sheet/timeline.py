@@ -74,7 +74,9 @@ class Timeline:
         parts = []
         for local, anim in self.clips:
             end = local + anim.get_run_time()
-            if end > self.n_frames / self.fps + 1e-6:
+            # A clip may end on the true cut even when the grid-rounded last frame precedes it
+            # (e.g. a caption exit ending at 6.62 when the cut rounds down to frame 397 at 60 fps).
+            if end > (self.t1 - self.t0) + 1.0 / self.fps + 1e-6:
                 raise ValueError(f"{self.scene_id}: clip ends at {end + self.t0:.3f} after scene end {self.t1}")
             steps = [] if local <= 1e-9 else [Wait(local)]
             if not anim.is_introducer() and anim.mobject is not None:

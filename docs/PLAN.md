@@ -40,11 +40,17 @@ family of real transfer functions, and narration is captions only.
 ## 4. File structure
 ```
 CLAUDE.md  requirements.txt  docs/PLAN.md
-rubber_sheet/ theme.py physics.py script.py captions.py surface.py panels.py circuit.py camera.py states.py
-scenes/ s01_hook_title.py s02_circuit.py s03_poles_sheet.py s04_slice_bode.py s05_zero_nail.py
-        s06_sweep.py s07_limit_payoff.py  probe_fixed_frame.py bench_live.py (Gate 2 throwaways)
-tools/  smoke_test.py render.sh keyframes.py check_captions.py check_continuity.py check_palette.py
-tests/  test_physics.py test_panel_data.py test_captions.py test_camera.py
+manim.cfg  pytest.ini
+rubber_sheet/ physics.py theme.py script.py beats.py camera.py rig.py timeline.py captions.py
+              surface.py panels.py world.py common.py layout.py      (built at Gates 1–2)
+              circuit.py                                               (S2, after Gate 3)
+scenes/ s03_poles_sheet.py  probe_fixed_frame.py bench_live.py         (built; probe/bench are throwaways)
+        s01_hook_title.py s02_circuit.py s04_slice_bode.py s05_zero_nail.py s06_sweep.py
+        s07_limit_payoff.py                                            (after Gate 3)
+tools/  smoke_test.py keyframes.py check_captions.py                   (built)
+        render.sh check_continuity.py check_palette.py                 (to build with the remaining scenes)
+tests/  test_physics test_captions test_captions_render test_camera test_timeline test_panel_data
+        test_layout test_composition test_depth_sort
 ```
 
 ## 5. Theme
@@ -58,12 +64,16 @@ tests/  test_physics.py test_panel_data.py test_captions.py test_camera.py
 - Easing: ENTER ease_out_cubic (0.5–0.8 s), EXIT ease_in_cubic (0.35–0.5 s), camera = trapezoidal
   velocity profile with 0.8 s ramps, sweeps `smooth` on a log-mapped tracker.
 - Camera: peak combined angular speed √(φ'²+θ'²) ≤ 15°/s, checked at 600 samples per move.
-- Layout: frame 14.22×8; 5 % title-safe; caption band y ∈ [−3.80, −2.70], x ∈ [−6.4, 6.4];
-  analysis layout: sheet in left 58 %, panels x ∈ [1.9, 6.75], y ∈ [−2.55, 3.75].
+- Layout: frame 14.22×8; title-safe |x| ≤ 6.4, |y| ≤ 3.6; caption band y ∈ [−3.80, −2.70],
+  x ∈ [−6.4, 6.4]; panel column x ∈ [1.9, 6.4]: BODE_BOX (2.45, 6.15, 1.35, 3.12), IMPULSE_BOX
+  (2.45, 6.15, −1.95, −0.05). Enforced by tests/test_layout.py and tests/test_composition.py.
 
 ## 6. Caption system
-- `Caption(id)`: per-word Inter `Text` + per-token `MathTex` for `$…$`, baseline-aligned, ≤ 2
-  lines; emphasis = accent color + 0.25 s underline sweep.
+- `Caption(id)`: one MarkupText line in Inter (ligatures off, glyphs mapped 1:1 to characters,
+  asserted), grouped per word; `$…$` math tokens are converted to Unicode (`\omega`→ω, …; unknown
+  TeX raises) and set in Inter italic (letters only) — consistent with the caption face, instead of
+  per-token MathTex. ≤ 2 lines. Emphasis = accent colour + 0.25 s underline under the accent glyphs
+  only, below the row's lowest descender.
 - Reveal: word mode LaggedStart FadeIn(shift 0.08·UP, scale 0.97), lag 0.12; phrase mode lag 0.35;
   0.8 s. Exit: FadeOut(shift 0.06·UP), 0.4 s.
 - Scrim: 12 stacked full-width rectangles, BG color, opacity 0 → 0.75 (ease-in). 24 if banding
@@ -71,8 +81,11 @@ tests/  test_physics.py test_panel_data.py test_captions.py test_camera.py
 - Rule: 200 wpm, math token = 2 words, hold = 0.5 + n/3.33 (ceil 0.01 s), slot = 0.8 + hold + 0.4.
   Same-band reveals start ≥ previous exit end, except `continuation=True` pairs (only C7/C8), which
   may start at the previous hold end.
-- `CaptionTrack`: `show`, `dismiss` (enforces hold), `protect(mob)` for the overlap checker
-  (screen-space bboxes; 3D via `camera.project_points`), JSON log in out/captions/.
+- `CaptionTrack`: `clips()` → (local time, reveal/exit animation) pairs placed on the scene's
+  Timeline at the script's times (holds met by construction; a reveal clamped onto a grid-rounded
+  scene start moves the whole caption). `monitor()` scene updater: logs first/last visible frame,
+  checks protected visuals against the band, 3D visuals against fixed HUD blocks (annotations
+  excepted), and flags stray unregistered mobjects. `write_log()` → out/captions/<scene>.json.
 
 ## 7. Storyboard and caption table (authoritative)
 R = reveal, H = hold, X = exit end; n counts words, math token = 2.
@@ -119,10 +132,12 @@ S7 61.00–76.00.
   fades in upper third over the hook (no separate card); 0.3 s dip to BG at the end.
 - **S2 6.62–11.6 Circuit.** `Create` schematic (6.7–9.2) simultaneously with `Write(H(s))`
   (7.4–9.4); values R = 120 Ω, L = 10 mH, C = 1 µF; v_out bracket on C; H(s) to top-left (10.4–11.4).
-- **S3 11.6–25.0 Poles → sheet.** Top-down s-plane; denominator = 0 → roots fly to × at −6 ± j8
-  (11.8–13.4), dashed |s| = 10 circle. Tilt φ 0→58° (θ fixed) 15.6–20.6. Lift
-  18.0–20.5; tag `height = 20 log₁₀|H|` (dB) appears at 18.0 and persists, plus floor tag
-  "floor: −40 dB (clipped)". θ −90→−50° 21.0–24.6. "pole" labels on tent poles 21.2.
+- **S3 11.6–25.0 Poles → sheet (built).** s-plane fades in 11.6; `LCs²+RCs+1 = 0` writes 11.8–12.6;
+  `⇒ s = −6 ± j8 krad/s` 12.7–13.3; two × fly from the end of that line 13.3–14.4 and hand over
+  to the world × at 14.4; dashed |s| = 10 circle 13.6–14.6; tilt φ 0→58° 15.6–20.6 (tick labels
+  fade); lift + sheet fade from 18.0 (2.5 s / 2.0 s); tag `height = 20 log₁₀|H| (dB)` with
+  "floor −40 dB · soft ceiling +40 dB" at 18.0 (persists); jω floor label fades at 18.0; tent
+  poles grow with the lift; θ −90→−50° 21.0–24.6; "pole" labels (screen-anchored) 21.2.
 - **S4 25.0–35.72 Slice → Bode.** Gold σ = 0 plane 25.3; σ > 0 half lowers/fades 26.0–27.5; swing
   to CUT 25.4–30.2; 3D→fixed handoff 30.3; fly to panel 30.4–31.8; log warp 33.2–35.2
   (droppable); hold to 35.72.
@@ -144,8 +159,12 @@ S7 61.00–76.00.
   preview 16×24 = 384 faces, review 36×56 = 2016, final 56×84 = 4704; refresh ≈ 9 ms/frame.
   Domain σ ∈ [−15, 5], ω ∈ [−15, 15] krad/s (changed at Gate 2 from ±20: poles never exceed
   |ω| = 10 and ±15 lets the top view fit legibly; the linear-ω Bode view spans 0–15 krad/s).
-- **Depth:** painter's sort adequate for a height field; tent poles/nail as ~24 stacked segments;
-  cut curve at σ = 0 with 0.01 z-offset.
+- **Depth (RigCamera):** 3D leaves are painted far-to-near by horizontal distance from the eye
+  (stock bbox-centre key left 4–114 back-face pixels at the spikes; this gives 0 — test_depth_sort).
+  Floor objects (grid, axes, circle, ×, axis labels) are a layer painted first; tent-pole segments
+  below the sheet are painted before it, those above sort just after the faces at the pole.
+  Sheet faces carry precomputed sort points (137 → 11 ms/frame). Nodes snap onto each pole, so
+  the drawn peak is exactly the ceiling at every R (no bobbing during the sweep).
 - **jω cut → panel:** exact 600-sample polyline (not read off the mesh); at handoff project with
   `camera.project_points`, swap in an identical fixed-frame VMobject, `Transform` to the panel
   curve. BodePanel x(ω) = (1−μ)·lin + μ·log (data exact, axis warped); +∞ at R = 0 → clipped with
@@ -161,9 +180,11 @@ S7 61.00–76.00.
   non-introducer clip's mobject is added at t = 0), `EnsureIn` before non-introducer clips, driver
   mobject at the back so all mobjects redraw every frame.
 - **Impulse panel:** 1500 samples, t ∈ [0, 8] ms, y = h/ω₀ ∈ ±1.3, coral dashed envelope.
-- **Camera presets:** TOP (φ 0, zoom 0.8), HERO (62°, −60°), CUT (82°, 0°), ANALYSIS (60°, −40°, panned
-  left) — `rubber_sheet/camera.py`. Scene boundaries share `states.py` snapshots; `check_continuity.py` requires
-  < 1.5 % mean pixel diff across cuts.
+- **Camera presets** (`rubber_sheet/camera.py`): TOP (φ 0), S3_TILTED/S3_END, HERO, CUT, ANALYSIS;
+  zoom/pan chosen against tests/test_composition.py (projected floor/sheet/labels clear of the
+  band, inside title-safe, left of the panel column, clear of the formula and height tag, along
+  every move). Scene boundary states are these CamStates; `check_continuity.py` (to build with
+  the remaining scenes) will require < 1.5 % mean pixel diff across cuts.
 
 ## 9. Risks
 | Risk | Mitigation |
@@ -188,9 +209,11 @@ S7 61.00–76.00.
    panel-data inversion, caption rule (n recomputed from text, holds, sequencing, no caption
    crosses a scene cut, ≤ 78 s), camera (state continuity, peak speed from start/end states,
    600-sample numeric check, ≤ 15°/s).
-2. Preview renders + `check_captions.py` (overlap, hold vs log within ±1 frame).
-3. `keyframes.py`: PNGs at each caption mid-hold, beat boundaries, sweep u ∈ {0, 0.5, 1}; contact
-   sheet; every frame inspected. Repeat at 1080p for legibility.
+2. Renders + `check_captions.py`: first/last visible frame equal to the exact frames expected on
+   the film grid (±0.5 frame), on-screen ≥ reveal + hold, x-height, overlap violations, strays.
+3. `keyframes.py <scene>`: clears out/keys/<scene>, extracts scene edges, every caption's
+   mid-hold and beat times (plus extras) from the newest render, builds a labelled contact sheet;
+   every frame inspected at 1080p.
 4. `check_continuity.py` across scene cuts.
 5. Final: ffprobe (resolution, 60 fps, duration, no audio) + 4K/1080p keyframe spot-check.
 
@@ -210,5 +233,6 @@ session's tools can create releases — checked at Gate 3).
 1. Install, LaTeX + font smoke test, test_physics.py. (done; pre-Gate-2 fixes: scene cuts moved
    so no caption crosses one, pytest.ini, state-derived camera test, impulse atol 1e-6)
 2. LiveSurface, captions, theme, S3 at preview + keyframes; fixed-in-frame probe; bench_live.py.
+   (done, pending approval; reviewed by a 4-lens adversarial workflow, findings fixed)
 3. 2 s timing of bench_live.py at 4K60 and 1080p60 → full estimate, 4K go/no-go.
 Remaining scenes only after Gates 2 and 3 are approved.

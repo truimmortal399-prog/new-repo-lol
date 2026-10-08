@@ -36,7 +36,7 @@ from rubber_sheet import theme as th
 from rubber_sheet.timeline import clamp_local
 
 _TOKEN = re.compile(r"\{(POLE|ZERO|SIGNAL):([^{}]*)\}|\$([^$]*)\$|(\s+)|([^\s{$]+)")
-_DESCENDERS = set("gjpqyQ,;()|")
+UNDERLINE_GAP = 0.05  # below the lowest descender of the row
 _PHRASE_BREAK = re.compile(r"[,:;.…]$")
 
 
@@ -61,6 +61,19 @@ class _Word:
         return roles.pop() if len(roles) == 1 else None
 
 
+# TeX commands allowed inside caption math tokens, set as Unicode in Inter (letters italic).
+TEX_TO_UNICODE = {r"\omega": "ω", r"\zeta": "ζ", r"\sigma": "σ", r"\infty": "∞", r"\pm": "±", r"\cdot": "·"}
+
+
+def math_chars(tex):
+    """'j\\omega' -> [('j', italic), ('ω', italic)]; digits/operators upright. Raises on unknown TeX."""
+    for cmd, uni in TEX_TO_UNICODE.items():
+        tex = tex.replace(cmd, uni)
+    if "\\" in tex or "{" in tex or "^" in tex or "_" in tex:
+        raise ValueError(f"unsupported TeX in caption math token: {tex!r}")
+    return [(ch, ch.isalpha()) for ch in tex]
+
+
 def _parse(text):
     """Split caption markup into words of styled characters."""
     words, current = [], _Word()
@@ -71,8 +84,9 @@ def _parse(text):
             words.append(current)
         current = _Word()
 
-    def emit(segment, italic, role):
-        for ch in segment:
+    def emit(segment, role, math=False):
+        chars = math_chars(segment) if math else [(ch, False) for ch in segment]
+        for ch, italic in chars:
             if ch.isspace():
                 flush()
             else:
@@ -82,9 +96,9 @@ def _parse(text):
         # segment may contain $...$ math
         for part in re.split(r"(\$[^$]*\$)", segment):
             if part.startswith("$") and part.endswith("$") and len(part) >= 2:
-                emit(part[1:-1], True, role)
+                emit(part[1:-1], role, math=True)
             else:
-                emit(part, False, role)
+                emit(part, role)
 
     pos = 0
     for m in _TOKEN.finditer(text):
@@ -94,11 +108,11 @@ def _parse(text):
         if m.group(1):
             emit_mixed(m.group(2), m.group(1))
         elif m.group(3) is not None:
-            emit(m.group(3), True, None)
+            emit(m.group(3), None, math=True)
         elif m.group(4):
             flush()
         else:
-            emit(m.group(5), False, None)
+            emit(m.group(5), None)
     if pos != len(text):
         raise ValueError(f"unparsed caption markup at {pos}: {text!r}")
     flush()
@@ -142,9 +156,10 @@ class Caption(VGroup):
         rows = self._wrap(words, font, size, weight, emph_weight)
         self.words = VGroup()
         self.word_specs = []
+        self.glyph_info = []  # (glyph, _Char, row index) in reading order
         self.underlines = VGroup()
         text_rows = VGroup()
-        for row in rows:
+        for row_idx, row in enumerate(rows):
             mt = MarkupText(_markup(row, emph_weight), font=font, font_size=size, weight=weight, color=th.FG)
             n_chars = sum(len(w.chars) for w in row)
             if len(mt.submobjects) != n_chars:
@@ -155,6 +170,7 @@ class Caption(VGroup):
                 k = len(w.chars)
                 self.words.add(VGroup(*mt.submobjects[i : i + k]))
                 self.word_specs.append(w)
+                self.glyph_info += [(g, c, row_idx) for g, c in zip(mt.submobjects[i : i + k], w.chars)]
                 i += k
         text_rows.arrange(np.array([0.0, -1.0, 0.0]), buff=0.18)
         center_y = th.CAPTION_CENTER_Y if line.region == "band" else 2.6
@@ -173,28 +189,27 @@ class Caption(VGroup):
         return [words[:split], words[split:]]
 
     def _build_underlines(self):
-        runs, current, role = [], [], None
-        for glyphs, spec in zip(self.words, self.word_specs):
-            r = spec.role
-            if r and r == role and current:
-                current.append((glyphs, spec))
+        """One underline per run of consecutive accent glyphs of the same role (a run may span
+        words, never a non-accent glyph such as trailing punctuation). The line sits below the
+        row's lowest descender, so it never cuts through letters."""
+        runs, current = [], []
+        for g, c, row in self.glyph_info:
+            if c.role and current and current[-1][1].role == c.role and current[-1][2] == row:
+                current.append((g, c, row))
             else:
                 if current:
-                    runs.append((role, current))
-                current, role = ([(glyphs, spec)], r) if r else ([], None)
+                    runs.append(current)
+                current = [(g, c, row)] if c.role else []
         if current:
-            runs.append((role, current))
-        for role, items in runs:
-            glyphs = VGroup(*[g for g, _ in items])
-            base = [
-                gl.get_bottom()[1]
-                for g, s in items
-                for gl, c in zip(g.submobjects, s.chars)
-                if c.ch not in _DESCENDERS
-            ]
-            y = (min(base) if base else glyphs.get_bottom()[1]) - 0.07
+            runs.append(current)
+        row_bottom = {}
+        for g, c, row in self.glyph_info:
+            row_bottom[row] = min(row_bottom.get(row, np.inf), g.get_bottom()[1])
+        for run in runs:
+            glyphs = VGroup(*[g for g, _, _ in run])
+            y = row_bottom[run[0][2]] - UNDERLINE_GAP
             ul = Line([glyphs.get_left()[0], y, 0], [glyphs.get_right()[0], y, 0])
-            ul.set_stroke(th.ROLE_COLORS[role], width=2.5, opacity=0.6)
+            ul.set_stroke(th.ROLE_COLORS[run[0][1].role], width=th.UNDERLINE_WIDTH, opacity=th.UNDERLINE_OPACITY)
             self.underlines.add(ul)
 
     # --- animations ---------------------------------------------------------------------
@@ -280,8 +295,12 @@ class CaptionTrack:
         out = []
         for cid, cap in self.captions.items():
             line = cap.line
-            out.append((clamp_local(line.reveal - self.t0, self.fps, cid), cap.reveal()))
-            out.append((clamp_local(line.hold_end - self.t0, self.fps, cid), cap.exit()))
+            raw = line.reveal - self.t0
+            reveal = clamp_local(raw, self.fps, cid)
+            # a reveal clamped onto the scene's first frame moves the whole caption, so the hold
+            # never drops below the reading-time rule
+            out.append((reveal, cap.reveal()))
+            out.append((round(line.hold_end - self.t0 + (reveal - raw), 6), cap.exit()))
         return out
 
     def allow_world(self, *mobs):
@@ -289,9 +308,12 @@ class CaptionTrack:
         for m in mobs:
             self.world_flat.update(m.get_family())
 
-    def protect(self, name, mob, fixed):
-        """Register a key visual that must never enter the caption band or a caption's box."""
-        self.protected.append((name, mob, fixed))
+    def protect(self, name, mob, fixed, annotation=False):
+        """Register a key visual that must never enter the caption band or a caption's box.
+
+        Fixed (HUD) visuals are also kept clear of projected 3D visuals, except annotations:
+        labels that deliberately sit next to the 3D geometry they name."""
+        self.protected.append((name, mob, fixed, annotation))
 
     # --- per-frame monitoring ---------------------------------------------------------------
     def monitor(self):
@@ -314,16 +336,32 @@ class CaptionTrack:
             self._check_strays(in_scene, t_local + self.t0)
             band = (th.CAPTION_BAND["x0"], th.CAPTION_BAND["y0"], th.CAPTION_BAND["x1"], th.CAPTION_BAND["y1"])
             boxes = [("band", band)] + [(cid, _bbox_fixed(c.words)) for cid, c in visible.items() if c.line.region != "band"]
-            for name, mob, fixed in self.protected:
+            t = round(t_local + self.t0, 3)
+            hud, world_pts = [], []
+            for name, mob, fixed, annotation in self.protected:
                 m = mob() if callable(mob) else mob
                 if m is None or not any(f in in_scene for f in m.get_family()):
                     continue
                 if _max_opacity(m) < 0.02:
                     continue
-                box = _bbox_fixed(m) if fixed else _bbox_projected(self.scene.camera, m)
+                if fixed:
+                    box = _bbox_fixed(m)
+                    if not annotation:
+                        hud.append((name, box))
+                else:
+                    pts = _projected_points(self.scene.camera, m)
+                    world_pts.append((name, pts))
+                    box = _bbox(pts)
                 for other, obox in boxes:
                     if _intersects(box, obox):
-                        self.violations.append(dict(t=round(t_local + self.t0, 3), visual=name, with_=other))
+                        self.violations.append(dict(t=t, visual=name, with_=other))
+            # 3D visuals must not run into fixed overlays (formula, tags, panels): any projected
+            # outline point inside an overlay's box is a collision.
+            for name, pts in world_pts:
+                for hname, (x0, y0, x1, y1) in hud:
+                    inside = (pts[:, 0] > x0) & (pts[:, 0] < x1) & (pts[:, 1] > y0) & (pts[:, 1] < y1)
+                    if inside.any():
+                        self.violations.append(dict(t=t, visual=name, with_=hname))
 
         return update
 
@@ -378,20 +416,38 @@ def _max_opacity(mob):
     return max(ops, default=0.0)
 
 
-def _bbox_fixed(mob):
-    pts = mob.get_all_points()
+def _leaf_points(mob):
+    """All points of a mobject's family in one concatenate (Mobject.get_all_points builds the
+    array with repeated np.append: ~200 ms for the 4704-face sheet). LiveSurface supplies its
+    own small outline instead."""
+    if hasattr(mob, "outline_points"):
+        return mob.outline_points()
+    leaves = [m.points for m in mob.get_family() if m.has_points()]
+    return np.concatenate(leaves) if leaves else np.zeros((0, 3))
+
+
+def _bbox(pts):
     if len(pts) == 0:
         return (0.0, 0.0, 0.0, 0.0)
     return (float(pts[:, 0].min()), float(pts[:, 1].min()), float(pts[:, 0].max()), float(pts[:, 1].max()))
+
+
+def _bbox_fixed(mob):
+    return _bbox(_leaf_points(mob))
+
+
+def _projected_points(camera, mob):
+    pts = _leaf_points(mob)
+    if len(pts) and hasattr(camera, "screen_points"):
+        pts = camera.screen_points(pts)  # fresh rotation (project_points is a frame stale here)
+    elif len(pts) and hasattr(camera, "project_points"):
+        camera.reset_rotation_matrix()
+        pts = camera.project_points(pts)
+    return pts
 
 
 def _bbox_projected(camera, mob):
-    pts = mob.get_all_points()
-    if len(pts) == 0:
-        return (0.0, 0.0, 0.0, 0.0)
-    if hasattr(camera, "project_points"):
-        pts = camera.project_points(pts)
-    return (float(pts[:, 0].min()), float(pts[:, 1].min()), float(pts[:, 0].max()), float(pts[:, 1].max()))
+    return _bbox(_projected_points(camera, mob))
 
 
 def _intersects(a, b):

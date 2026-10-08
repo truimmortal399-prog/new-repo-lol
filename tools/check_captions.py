@@ -1,4 +1,5 @@
-"""Check a scene's caption log: observed timing vs script (±1 frame), legibility, overlap violations.
+"""Check a scene's caption log: observed first/last visible frame vs the exact frames expected on
+the film grid (±0.5 frame), legibility, overlap violations, stray unregistered mobjects.
 
   .venv/bin/python tools/check_captions.py S3 [--fps 15]
 Exit status 1 on any failure.
@@ -6,6 +7,7 @@ Exit status 1 on any failure.
 
 import argparse
 import json
+import math
 import os
 import sys
 
@@ -19,21 +21,30 @@ def main():
     ap.add_argument("scene")
     ap.add_argument("--fps", type=float, default=15.0)
     args = ap.parse_args()
-    frame = 1.0 / args.fps
+    fps = args.fps
+    frame = 1.0 / fps
     log = json.load(open(os.path.join("out", "captions", f"{args.scene}.json")))
+    t0 = sc.scene_start_on_grid(args.scene, fps)
     ok = True
     for c in log["captions"]:
         line = sc.BY_ID[c["id"]]
+        # Same placement as CaptionTrack.clips: a reveal before the grid start is clamped onto
+        # the scene's first frame and the whole caption moves with it.
+        shift = max(t0 - line.reveal, 0.0)
+        reveal, exit_end = line.reveal + shift, line.exit_end + shift
+        # first frame strictly after the reveal starts; last frame strictly before the exit ends
+        exp_first = t0 + (math.floor((reveal - t0) * fps + 1e-6) + 1) / fps
+        exp_last = t0 + (math.ceil((exit_end - t0) * fps - 1e-6) - 1) / fps
         problems = []
         if c["first_visible"] is None:
             problems.append("never visible")
         else:
-            if abs(c["first_visible"] - line.reveal) > 1.5 * frame:
-                problems.append(f"first visible {c['first_visible']:.3f} vs reveal {line.reveal:.3f}")
-            if c["last_visible"] < line.hold_end - frame:
-                problems.append(f"last visible {c['last_visible']:.3f} before hold end {line.hold_end:.3f}")
-            if c["last_visible"] > line.exit_end + 1.5 * frame:
-                problems.append(f"still visible {c['last_visible']:.3f} after exit end {line.exit_end:.3f}")
+            if abs(c["first_visible"] - exp_first) > 0.5 * frame:
+                problems.append(f"first visible {c['first_visible']:.3f}, expected {exp_first:.3f}")
+            if abs(c["last_visible"] - exp_last) > 0.5 * frame:
+                problems.append(f"last visible {c['last_visible']:.3f}, expected {exp_last:.3f}")
+            if c["last_visible"] - c["first_visible"] < line.hold + sc.REVEAL - frame:
+                problems.append("on screen shorter than reveal + hold")
         xh = c.get("x_height")
         if xh is not None and xh < th.MIN_CAPTION_XHEIGHT:
             problems.append(f"x-height {xh:.4f} < {th.MIN_CAPTION_XHEIGHT}")

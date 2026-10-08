@@ -6,7 +6,7 @@ registration; objects rebuilt by always_redraw would not be in it).
 """
 
 import numpy as np
-from manim import DOWN, LEFT, RIGHT, UP, Line, MarkupText, Rectangle, Text, VGroup, VMobject
+from manim import LEFT, RIGHT, UP, Line, MarkupText, Rectangle, Text, VGroup, VMobject
 
 from rubber_sheet import physics as ph
 from rubber_sheet import theme as th
@@ -99,9 +99,10 @@ class BodePanel(Panel):
         self.decade_lines = VGroup(*[Line(), Line(), Line()])
         self.decade_labels = VGroup(*[self.label(s) for s in ("1", "10", "100")])
         self.add(self.ticks, self.decade_lines, self.decade_labels)
-        self.title = self.label("|H(jω)|  dB", size=th.SIZE_LABEL, color=th.FG).next_to(self.frame_rect, UP, buff=0.08, aligned_edge=LEFT)
-        self.xtitle = self.label("ω  (krad/s)", size=th.SIZE_SMALL).next_to(self.frame_rect, DOWN, buff=0.36, aligned_edge=RIGHT)
-        self.xtitle.shift(0.12 * DOWN)
+        self.title = MarkupText("|<i>H</i>(<i>jω</i>)|  dB", font=th.FONT_BODY, font_size=th.SIZE_LABEL, color=th.FG)
+        self.title.next_to(self.frame_rect, UP, buff=0.08, aligned_edge=LEFT)
+        self.xtitle = self.label("ω  (krad/s)", size=th.SIZE_SMALL)
+        self.xtitle.move_to([x1, y0 - th.PANEL_AXIS_TITLE_ROW, 0], aligned_edge=RIGHT)
         self.add(self.title, self.xtitle)
         self.curve = VMobject().set_stroke(th.SIGNAL, width=3.5)
         self.add(self.curve)
@@ -137,7 +138,7 @@ class BodePanel(Panel):
             p = self.to_screen([xd, xd], [self.DB[0], self.DB[1]])
             line.points = _straight_cubics(p)
             line.set_stroke(th.FAINT, width=1.0, opacity=0.5 if vis else 0.0)
-            lab.move_to([p[0, 0], self.box[2] - 0.16, 0])
+            lab.move_to([p[0, 0], self.box[2] - th.PANEL_TICK_ROW, 0])
             lab.set_opacity(1.0 if vis else 0.0)
         return self
 
@@ -157,12 +158,10 @@ class ImpulsePanel(Panel):
         self.add(self.hline(0.0, th.FAINT, width=1.0, opacity=0.9))
         for ms in (2, 4, 6):
             self.add(self.vline(ms, th.FAINT, width=1.0, opacity=0.4))
-        self.tick_labels = VGroup(*[self.label(str(ms)).move_to([*self.to_screen([ms], [0])[0][:1], y0 - 0.16, 0]) for ms in (0, 2, 4, 6, 8)])
-        for lab, ms in zip(self.tick_labels, (0, 2, 4, 6, 8)):
-            lab.move_to([self.to_screen([ms], [0])[0][0], y0 - 0.16, 0])
+        self.tick_labels = VGroup(*[self.label(str(ms)).move_to([self.to_screen([ms], [0])[0, 0], y0 - th.PANEL_TICK_ROW, 0]) for ms in (0, 2, 4, 6, 8)])
         self.title = self.label("impulse response  h(t)", size=th.SIZE_LABEL, color=th.FG).next_to(self.frame_rect, UP, buff=0.08, aligned_edge=LEFT)
-        self.xtitle = self.label("t  (ms)", size=th.SIZE_SMALL).next_to(self.frame_rect, DOWN, buff=0.36, aligned_edge=RIGHT)
-        self.xtitle.shift(0.12 * DOWN)
+        self.xtitle = self.label("t  (ms)", size=th.SIZE_SMALL)
+        self.xtitle.move_to([x1, y0 - th.PANEL_AXIS_TITLE_ROW, 0], aligned_edge=RIGHT)
         self.envelope = VMobject().set_stroke(th.POLE, width=2.0, opacity=0.85)
         self.curve = VMobject().set_stroke(th.SIGNAL, width=2.5)
         self.add(self.tick_labels, self.title, self.xtitle, self.envelope, self.curve)
@@ -205,18 +204,31 @@ class Readout(VGroup):
         zero = self.glyphs["0"]
         self.digit_h = zero.height
         self.zero_bottom = zero.get_bottom()[1]
-        self.slot_w = max(self.glyphs[d].width for d in "0123456789") * 1.12
+        self.slot_w = max(self.glyphs[d].width for d in "0123456789") * 1.12  # digits, signs, ∞
+        self.dot_w = self.glyphs["."].width * 2.2  # the decimal point gets a narrow cell
+        self.label_h0 = self.label.height  # layout scales with the label if the readout is scaled
         self.slots = VGroup(*[VMobject().set_fill(color, opacity=1.0).set_stroke(width=0) for _ in range(n_slots)])
         self.unit = Text(unit, font=th.FONT_BODY, font_size=size, color=color) if unit else VGroup()
         self.add(self.label, self.slots, self.unit)
-        self.anchor = np.zeros(3)
+        self.anchor = None
         self.text = ""
         self.refresh()
         self.add_updater(lambda m: m.refresh())
 
+    def align_right(self, x):
+        """Shift the whole readout so its right edge (unit, or last digit) sits at x."""
+        self.shift(np.array([x - self.get_right()[0], 0.0, 0.0]))
+        self.refresh()
+        return self
+
+    def field_width(self):
+        """Width of the number field: all cells digit-wide except one decimal point cell."""
+        has_dot = "." in self.fmt.format(1.0)
+        return (len(self.slots) - has_dot) * self.slot_w + has_dot * self.dot_w
+
     def place(self, point):
-        self.anchor = np.array(point, dtype=float)
-        self.label.move_to(self.anchor, aligned_edge=LEFT)
+        """Put the left end of the label at `point` (digits are vertically centred on it)."""
+        self.label.move_to(np.array(point, dtype=float), aligned_edge=LEFT)
         self.text = ""
         self.refresh()
         return self
@@ -227,20 +239,30 @@ class Readout(VGroup):
         return self.fmt.format(value).replace("-", "−")
 
     def refresh(self):
-        text = self.format(self.value_fn()).rjust(len(self.slots))[-len(self.slots) :]
-        if text == self.text:
+        raw = self.format(self.value_fn())
+        if len(raw) > len(self.slots):
+            raise ValueError(f"readout overflow: {raw!r} needs more than {len(self.slots)} slots")
+        text = raw.rjust(len(self.slots))
+        # Layout follows the label wherever it is now (the readout may have been moved).
+        k = self.label.height / self.label_h0
+        anchor = (self.label.get_left()[0], self.label.get_center()[1], k)
+        if text == self.text and anchor == self.anchor:
             return self
-        self.text = text
-        baseline = self.anchor[1] - self.digit_h / 2
-        x = self.label.get_right()[0] + 0.1
-        for slot, ch in zip(self.slots, text):
+        self.text, self.anchor = text, anchor
+        baseline = anchor[1] - k * self.digit_h / 2
+        # Lay out from a fixed right edge, so the decimal point never moves as values change.
+        widths = [k * (self.dot_w if ch == "." else self.slot_w) for ch in text]
+        right = self.label.get_right()[0] + k * 0.12 + k * self.field_width()
+        x = right - sum(widths)
+        for slot, ch, w in zip(self.slots, text, widths):
             g = self.glyphs.get(ch)
             if g is None:
                 slot.points = np.zeros((0, 3))
             else:
-                offset = np.array([x + self.slot_w / 2 - g.get_center()[0], baseline - self.zero_bottom, 0.0])
-                slot.points = g.points + offset
-            x += self.slot_w
+                # glyph drawn at scale k, horizontally centred in its cell, on the shared baseline
+                local = (g.points - np.array([g.get_center()[0], self.zero_bottom, 0.0])) * k
+                slot.points = local + np.array([x + w / 2, baseline, 0.0])
+            x += w
         if len(self.unit):
-            self.unit.move_to([x + 0.08, self.anchor[1], 0.0], aligned_edge=LEFT)
+            self.unit.move_to([right + k * 0.08, anchor[1], 0.0], aligned_edge=LEFT)
         return self

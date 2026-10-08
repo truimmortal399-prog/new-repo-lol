@@ -39,27 +39,34 @@ class BenchLive(ThreeDScene):
         floor = world.SPlaneFloor()
         floor.remove(floor.ticks, floor.unit)
         labels = world.AxisLabels()
-        rig.add_fixed_orientation_mobjects(labels.sigma, labels.jw)
+        labels.remove(labels.jw)  # faded out in S3 before the panels ever appear
+        rig.add_fixed_orientation_mobjects(labels.sigma)
 
         formula = common.formula_HC()
         tag = common.height_tag(formula)
         bode = BodePanel(lambda w: ph.mag_C(1j * w, R.get_value()), th.BODE_BOX)
         imp = ImpulsePanel(R.get_value, th.IMPULSE_BOX)
         readouts = VGroup(
-            Readout("<i>R</i> =", R.get_value, "{:.1f}", unit="Ω", n_slots=5).place([-6.45, -1.75, 0]),
-            Readout("<i>ζ</i> =", lambda: ph.zeta(R.get_value()), "{:.3f}", n_slots=5).place([-6.45, -2.2, 0]),
-            Readout("peak", lambda: 20 * np.log10(ph.resonance(R.get_value())[1]), "{:.1f}", unit="dB", size=th.SIZE_SMALL, n_slots=5).place([bode.box[1] - 2.0, bode.box[3] + 0.2, 0]),
+            Readout("<i>R</i> =", R.get_value, "{:.1f}", unit="Ω", n_slots=5).place([-6.3, -1.75, 0]),
+            Readout("<i>ζ</i> =", lambda: ph.zeta(R.get_value()), "{:.3f}", n_slots=5).place([-6.3, -2.2, 0]),
+            Readout("peak", lambda: 20 * np.log10(ph.resonance(R.get_value())[1]), "{:.1f}", unit="dB", size=th.SIZE_SMALL, color=th.SIGNAL, n_slots=5)
+            .place([0, bode.title.get_center()[1], 0]).align_right(bode.box[1]),
         )
         scrim = captions.make_scrim()
         caption = captions.Caption(sc.BY_ID["C13"])
         hud = [formula, tag, bode, imp, readouts, scrim, caption]
         rig.add_fixed_in_frame_mobjects(*hud)
         self.add(floor, world.DashedCircle(), sheet.crosses, sheet.surface, sheet.tents, labels, *hud)
+        # The overlap/stray monitor is part of every real scene, so it is part of the benchmark.
+        track = captions.CaptionTrack(self, "S6", check_every=th.MONITOR_EVERY)
+        for name, mob, fixed in [("sheet", sheet.surface, False), ("bode", bode, True), ("impulse", imp, True), ("readouts", readouts, True), ("formula", formula, True), ("height tag", tag, True)]:
+            track.protect(name, mob, fixed)
+        self.add_updater(track.monitor())
 
         t_start = time.perf_counter()
         self.play(
             _log_sweep(R, SECONDS),
-            rig.theta_tracker.animate(rate_func=lambda t: t).set_value((cam.ANALYSIS.theta + 8.0 * SECONDS / 11.5) * DEGREES),
+            rig.theta_tracker.animate(rate_func=th.LINEAR).set_value((cam.ANALYSIS.theta + 8.0 * SECONDS / 11.5) * DEGREES),
             run_time=SECONDS,
         )
         wall = time.perf_counter() - t_start

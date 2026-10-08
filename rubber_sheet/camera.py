@@ -27,13 +27,14 @@ class CamState:
 
 SHEET_CENTER = (-1.25, 0.0, 0.0)  # middle of the s-plane domain (sigma -15..5 krad/s -> x)
 SHEET_PIVOT = (-1.25, 0.0, 1.6)  # middle of the sheet volume
+# zoom/pan values are chosen against tests/test_composition.py (band, title-safe, panel column, HUD)
 
 TOP = CamState(phi=0.0, theta=-90.0, zoom=0.80, pivot=SHEET_CENTER, pan=(0.9, 0.55))  # looks 2D
-S3_TILTED = CamState(phi=58.0, theta=-90.0, zoom=0.80, pivot=SHEET_PIVOT, pan=(0.7, 0.55))
-S3_END = CamState(phi=58.0, theta=-50.0, zoom=0.80, pivot=SHEET_PIVOT, pan=(0.7, 0.55))
-CUT = CamState(phi=82.0, theta=0.0, zoom=0.85, pivot=SHEET_PIVOT, pan=(-2.3, 0.6))  # jw cut reads as a 2D profile
-ANALYSIS = CamState(phi=60.0, theta=-40.0, zoom=0.74, pivot=SHEET_PIVOT, pan=(-2.5, 0.55))
-HERO = CamState(phi=62.0, theta=-60.0, zoom=0.85, pivot=SHEET_PIVOT, pan=(0.0, 0.5))
+S3_TILTED = CamState(phi=58.0, theta=-90.0, zoom=0.74, pivot=SHEET_PIVOT, pan=(0.7, 0.76))
+S3_END = CamState(phi=58.0, theta=-50.0, zoom=0.74, pivot=SHEET_PIVOT, pan=(0.7, 0.76))
+CUT = CamState(phi=82.0, theta=0.0, zoom=0.78, pivot=SHEET_PIVOT, pan=(-3.0, -0.6))  # jw cut reads as a 2D profile
+ANALYSIS = CamState(phi=60.0, theta=-40.0, zoom=0.66, pivot=SHEET_PIVOT, pan=(-2.8, 0.1))
+HERO = CamState(phi=62.0, theta=-60.0, zoom=0.76, pivot=SHEET_PIVOT, pan=(0.0, 0.8))
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,7 @@ def trapezoid(run_time, ramp=RAMP):
     vmax = 1.0 / (1.0 - a)
 
     def rate(t):
+        t = min(max(t, 0.0), 1.0)  # manim does not clamp alpha for custom rate functions
         if t <= a:
             return vmax * t * t / (2.0 * a)
         if t >= 1.0 - a:

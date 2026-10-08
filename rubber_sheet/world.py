@@ -4,16 +4,21 @@ The s-plane lies in z = 0 (the -40 dB floor). Coordinates come from theme.s_to_x
 """
 
 import numpy as np
-from manim import MathTex, Text, VGroup, VMobject
+from manim import MathTex, Rectangle, Text, VGroup, VMobject
 
 from rubber_sheet import physics as ph
 from rubber_sheet import theme as th
 
 
-def _seg(a, b, color, width, opacity=1.0, shade=True):
+FLOOR_LAYER = -1  # RigCamera depth layer: drawn before everything else
+BIAS_GRID, BIAS_CIRCLE, BIAS_MARKER = 0.0, 500.0, 1000.0  # order inside the floor layer
+
+
+def _seg(a, b, color, width, opacity=1.0, shade=True, bias=BIAS_GRID):
     m = VMobject(shade_in_3d=shade)
     m.set_points_as_corners([a, b])
     m.set_stroke(color, width=width, opacity=opacity)
+    m.depth_layer, m.depth_bias = FLOOR_LAYER, bias
     return m
 
 
@@ -40,30 +45,40 @@ class SPlaneFloor(VGroup):
             _seg(xyz(smin, 0), xyz(smax, 0), th.MUTED, 2.0),
             _seg(xyz(0, omin), xyz(0, omax), th.MUTED, 2.0),
         )
+        # Tick labels (flat, top view only) on BG-coloured backings so grid lines and the |s|
+        # circle do not strike through them.
         self.ticks = VGroup()
         for s in (-15, -10, -5, 5):
-            t = Text(f"{s}".replace("-", "−"), font=th.FONT_BODY, font_size=th.SIZE_SMALL, color=th.MUTED)
-            t.move_to(xyz(s, -0.9))
-            self.ticks.add(t)
+            self.ticks.add(_tick(f"{s}", xyz(s, -0.9)))
         for w in (-15, -10, -5, 5, 10, 15):
-            t = Text(f"{w}".replace("-", "−"), font=th.FONT_BODY, font_size=th.SIZE_SMALL, color=th.MUTED)
-            t.next_to(xyz(0, w), np.array([1.0, 0, 0]), buff=0.08)
-            self.ticks.add(t)
+            lab = _tick(f"{w}", xyz(0, w))
+            lab.shift(np.array([lab.width / 2 + 0.06, 0, 0]))
+            self.ticks.add(lab)
         self.unit = Text("krad/s", font=th.FONT_BODY, font_size=th.SIZE_SMALL, color=th.MUTED)
         self.unit.move_to(xyz(smax - 0.2, -2.0)).shift(np.array([-self.unit.width / 2, 0, 0]))
         self.add(self.grid, self.axes, self.ticks, self.unit)
 
 
+def _tick(text, at):
+    label = Text(text.replace("-", "−"), font=th.FONT_BODY, font_size=th.SIZE_SMALL, color=th.MUTED)
+    backing = Rectangle(width=label.width + 0.08, height=label.height + 0.06).set_stroke(width=0).set_fill(th.BG, opacity=1.0)
+    return VGroup(backing, label).move_to(at)
+
+
 class AxisLabels(VGroup):
-    """sigma and jw labels; scenes register them as fixed-orientation billboards."""
+    """sigma and jw labels. Scenes register them as fixed-orientation billboards; they belong to
+    the floor layer (painted before the sheet, so a lifted sheet correctly covers them)."""
 
     def __init__(self):
         super().__init__()
         smin, smax = th.SIGMA_RANGE
         omin, omax = th.OMEGA_RANGE
         self.sigma = MathTex(r"\sigma", font_size=th.SIZE_MATH, color=th.MUTED).move_to(xyz(smax + 0.9, 0))
-        self.jw = MathTex(r"j\omega", font_size=th.SIZE_MATH, color=th.MUTED).move_to(xyz(-1.5, omax - 0.6))
+        self.jw = MathTex(r"j\omega", font_size=th.SIZE_MATH, color=th.MUTED).move_to(xyz(-2.6, omax - 0.9))
         self.add(self.sigma, self.jw)
+        for leaf in self.get_family():
+            leaf.shade_in_3d = True
+            leaf.depth_layer, leaf.depth_bias = FLOOR_LAYER, BIAS_MARKER
 
 
 CROSS_HALF = 0.13  # half-size of the x marker, world units
@@ -77,8 +92,8 @@ class Cross(VGroup):
         super().__init__()
         self.get_s = get_s_krad
         self.size = size
-        self.a = _seg(np.zeros(3), np.ones(3), color, width)
-        self.b = _seg(np.zeros(3), np.ones(3), color, width)
+        self.a = _seg(np.zeros(3), np.ones(3), color, width, bias=BIAS_MARKER)
+        self.b = _seg(np.zeros(3), np.ones(3), color, width, bias=BIAS_MARKER)
         self.add(self.a, self.b)
         self.refresh()
         self.add_updater(lambda m: m.refresh())
@@ -106,4 +121,29 @@ class DashedCircle(VGroup):
             m = VMobject(shade_in_3d=True)
             m.set_points_as_corners(np.column_stack([x, y, np.full(4, 0.006)]))
             m.set_stroke(color, width=width, opacity=opacity)
+            m.depth_layer, m.depth_bias = FLOOR_LAYER, BIAS_CIRCLE
             self.add(m)
+
+
+class ScreenLabel(VGroup):
+    """A label pinned to a world point with an offset in SCREEN space (fixed-in-frame).
+
+    World-space offsets (as with fixed-orientation billboards) rotate with the camera and can
+    swing a label onto other geometry; this keeps it e.g. up-right of its anchor on screen.
+    Register it with camera.add_fixed_in_frame_mobjects. Its updater only moves it (in place).
+    """
+
+    def __init__(self, mob, camera, get_world_point, offset=(0.22, 0.12)):
+        super().__init__(mob)
+        self.camera = camera
+        self.get_world_point = get_world_point
+        self.offset = np.array([offset[0], offset[1], 0.0])
+        # the label's corner nearest the anchor: bottom-left when offset right, bottom-right when left
+        self.corner = np.array([-1.0 if offset[0] >= 0 else 1.0, -1.0 if offset[1] >= 0 else 1.0, 0.0])
+        self.refresh()
+        self.add_updater(lambda m: m.refresh())
+
+    def refresh(self):
+        p = self.camera.screen_points(self.get_world_point())[0]
+        self.move_to(np.array([p[0], p[1], 0.0]) + self.offset, aligned_edge=self.corner)
+        return self

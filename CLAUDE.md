@@ -24,7 +24,8 @@ Stop and report at each gate. Never start S1/S2/S4–S7 before Gates 2 and 3 are
 3. 2 s timing of `scenes/bench_live.py` at 4K60 and 1080p60 -> full-render estimate.
 
 ## Theme rules (non-negotiable)
-- Colors, fonts, sizes, easing, z-mapping ONLY from `rubber_sheet/theme.py`. No literal hex/fonts in scenes.
+- Colors, fonts, sizes, easing, z-mapping ONLY from `rubber_sheet/theme.py`. No literal hex/fonts in
+  film scenes (`scenes/probe_*.py` diagnostics are exempt; `bench_live.py` follows the rule).
 - 3 accents with fixed roles: POLE (coral) = poles/instability, ZERO (teal) = zeros/nails,
   SIGNAL (gold) = what you measure (jω cut, Bode, h(t)).
 - Camera: trapezoidal velocity profile (0.8 s ramps); peak combined angular speed
@@ -62,6 +63,11 @@ Stop and report at each gate. Never start S1/S2/S4–S7 before Gates 2 and 3 are
   ReplacementTransform targets): copies are not registered fixed-in-frame and get projected as
   world objects. Animate registered mobjects only (`.animate`, FadeIn/FadeOut, Transform).
 - Run `.venv/bin/ruff check --select F,E9 --line-length 140 rubber_sheet scenes tools tests`.
+- Never animate LiveSurface/faces directly (its updater rewrites them); drive its trackers
+  (lift, opacity, right_drop, right_opacity). Objects with updaters must not be FadeIn'd (the fade
+  suspends their updaters): fade via their own opacity tracker, or let them grow from zero size.
+- Labels on 3D geometry: `world.ScreenLabel` (screen-space offset), protected as annotations.
+- Framing changes must keep tests/test_composition.py green (band, title-safe, panels, HUD).
 
 ## Quality bar
 No caption/visual overlap (automated), no caption shorter than its reading time (automated),
@@ -71,7 +77,8 @@ numerics agree with scipy (pytest). 3D: no visible faceting at the jω cut, no d
 ## Self-review procedure (after every scene change)
 1. `.venv/bin/python -m pytest -q tests/`  (numerics vs scipy, panel data inversion, captions, camera)
 2. Render the scene at -ql; `tools/check_captions.py` (overlap + hold-time log)
-3. `tools/keyframes.py <scene>` -> out/keys/<scene>/*.png + contact sheet; LOOK at every frame
+3. `.venv/bin/python tools/keyframes.py <scene>` (newest render) -> out/keys/<scene>/*.png +
+   contact sheet; LOOK at every frame. `tools/check_captions.py <scene> --fps <fps>` must pass.
 4. Checklist: legible? overlaps? clipped text/axes? colors per role? motion eased? cut continuity?
    Height tag present in every 3D frame after 18.0 s? Probe label matches the active transfer
    function (C, or R during 36.2–46.6 s)?
