@@ -136,23 +136,33 @@ S7 61.00–76.00.
   ringing. Pull back 68.2–70.8; R eases to 40 Ω; C17; clean final frame 74.2–75.6; fade 75.6–76.0.
 
 ## 8. Technical design
-- **LiveSurface:** fixed-topology quads, one vectorized numpy pass per frame writes `face.points`
-  and `fill_rgbas` in place. Pole-tracking adaptive grid: knots σ {σmin, Re p, 0, σmax},
-  ω {−ωmax, −Im p, 0, Im p, ωmax} (+ zero knot in B7), tanh clustering, fixed node count per
-  interval → a vertex sits on each pole and a node line on σ = 0. Presets: preview 18×36,
-  review 40×80, final 56×112. Domain σ ∈ [−15, 5], ω ∈ [−20, 20] krad/s.
+- **LiveSurface:** fixed-topology quads, one vectorized numpy pass per frame writes `face.points`,
+  `fill_rgbas` and `stroke_rgbas` in place, with vectorized Lambert shading (camera shading off).
+  Pole-tracking grid: nodes re-warped every frame by a density with Gaussian bumps at the poles
+  (and the zero in B7); σ = 0 is always a node line (exact cut, clean half split). Mesh peak at
+  the pole reaches ≥ 38 dB at final quality for all R. Presets (σ cells left|right × ω cells):
+  preview 16×24 = 384 faces, review 36×56 = 2016, final 56×84 = 4704; refresh ≈ 9 ms/frame.
+  Domain σ ∈ [−15, 5], ω ∈ [−15, 15] krad/s (changed at Gate 2 from ±20: poles never exceed
+  |ω| = 10 and ±15 lets the top view fit legibly; the linear-ω Bode view spans 0–15 krad/s).
 - **Depth:** painter's sort adequate for a height field; tent poles/nail as ~24 stacked segments;
   cut curve at σ = 0 with 0.01 z-offset.
 - **jω cut → panel:** exact 600-sample polyline (not read off the mesh); at handoff project with
   `camera.project_points`, swap in an identical fixed-frame VMobject, `Transform` to the panel
   curve. BodePanel x(ω) = (1−μ)·lin + μ·log (data exact, axis warped); +∞ at R = 0 → clipped with
   "↑ ∞" marker.
-- **Fixed-in-frame in ThreeDScene:** persistent mobjects mutated in place by updaters (no
-  `always_redraw` in 3D scenes) — to be confirmed at Gate 2 by `scenes/probe_fixed_frame.py`;
-  fallback transparent panel pass + ffmpeg overlay.
+- **Fixed-in-frame in ThreeDScene (settled at Gate 2, `scenes/probe_fixed_frame.py`):** stock
+  ThreeDCamera keeps in-place updates and same-structure always_redraw fixed, but projects
+  DecimalNumber digits, padded always_redraw children and later-added children. `RigCamera`
+  re-derives the fixed set from registered roots every frame → all five probe patterns fixed.
+- **RigCamera:** stock Cairo `frame_center` is broken for composition (cached cairo context,
+  double shift of 3D content, moves fixed-in-frame mobjects). RigCamera: frame_center = pivot
+  only, base mapping at ORIGIN, plus pan_x/pan_y for screen placement of 3D content.
+- **Timeline:** one play per scene; outer AnimationGroup with explicit empty group (else every
+  non-introducer clip's mobject is added at t = 0), `EnsureIn` before non-introducer clips, driver
+  mobject at the back so all mobjects redraw every frame.
 - **Impulse panel:** 1500 samples, t ∈ [0, 8] ms, y = h/ω₀ ∈ ±1.3, coral dashed envelope.
-- **Camera presets:** TOP (φ 0), HERO (62°, −60°), CUT (82°, 0°), ANALYSIS (60°, −40°, shifted
-  frame center). Scene boundaries share `states.py` snapshots; `check_continuity.py` requires
+- **Camera presets:** TOP (φ 0, zoom 0.8), HERO (62°, −60°), CUT (82°, 0°), ANALYSIS (60°, −40°, panned
+  left) — `rubber_sheet/camera.py`. Scene boundaries share `states.py` snapshots; `check_continuity.py` requires
   < 1.5 % mean pixel diff across cuts.
 
 ## 9. Risks

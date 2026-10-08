@@ -46,6 +46,20 @@ Stop and report at each gate. Never start S1/S2/S4–S7 before Gates 2 and 3 are
 - Sheet height is 20·log10|H| (dB) through `physics.zmap` — the on-screen tag must say so.
 - The zero slide (B7) is a hand-moved zero, disclosed on screen ("interpolated: zero moved by hand").
 
+## Manim 0.22 mechanics (verified at Gate 2 — follow these)
+- 3D scenes use `RigCamera` (`rubber_sheet/rig.py`). Never compose with stock `frame_center`: in
+  Cairo it is baked into a cached context, double-shifts 3D content and moves fixed-in-frame
+  mobjects. Compose with `CamState(pivot, zoom, pan)`; move with `rig.move_anims(camera, Move)`.
+- Fixed-in-frame: register with `camera.add_fixed_in_frame_mobjects` (does not add to scene).
+  RigCamera re-derives the fixed set from those roots every frame, so later-added children stay
+  fixed. Still prefer in-place updates; never use `DecimalNumber` for live values (use
+  `panels.Readout`).
+- Scenes run as one `Timeline` play (`rubber_sheet/timeline.py`): explicit empty group,
+  `EnsureIn` before non-introducer clips, a driver mobject at the back (everything redrawn).
+- Camera shading is off; `LiveSurface` shades its faces (vectorized Lambert).
+- `project_points` uses last frame's rotation inside updaters — use `RigCamera.screen_points`.
+- Run `.venv/bin/ruff check --select F,E9 --line-length 140 rubber_sheet scenes tools tests`.
+
 ## Quality bar
 No caption/visual overlap (automated), no caption shorter than its reading time (automated),
 no text below min size, no jitter in live readouts, continuity across scene cuts,

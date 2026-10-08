@@ -1,0 +1,71 @@
+"""Extract review keyframes from a rendered scene and build a labeled contact sheet.
+
+Times: scene start/end, every caption's mid-hold, and the beat times listed in EXTRA.
+  .venv/bin/python tools/keyframes.py S3 media/videos/s03_poles_sheet/480p15/S3PolesSheet.mp4
+Writes out/keys/<scene>/<film-time>.png and out/keys/<scene>/contact.png.
+"""
+
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from PIL import Image, ImageDraw, ImageFont  # noqa: E402
+
+from rubber_sheet import script as sc  # noqa: E402
+
+EXTRA = {
+    "S3": [12.4, 13.4, 13.9, 14.5, 15.6, 17.0, 18.0, 18.6, 19.4, 20.6, 21.0, 22.8, 24.9],
+}
+FONT = "/usr/share/fonts/opentype/inter/Inter-SemiBold.otf"
+
+
+def keyframe_times(scene_id):
+    t0, t1 = sc.SCENES[scene_id]
+    times = {round(t0 + 0.04, 2), round(t1 - 0.08, 2)}
+    for line in sc.lines_for(scene_id):
+        times.add(round(line.reveal_end + line.hold / 2, 2))
+    times.update(EXTRA.get(scene_id, []))
+    return sorted(times)
+
+
+def extract(video, t_local, path):
+    subprocess.run(
+        ["ffmpeg", "-loglevel", "error", "-y", "-ss", f"{t_local:.3f}", "-i", video, "-frames:v", "1", path],
+        check=True,
+    )
+
+
+def contact_sheet(paths, labels, out, cols=4, width=480):
+    ims = [Image.open(p).convert("RGB") for p in paths]
+    h = int(ims[0].height * width / ims[0].width)
+    rows = (len(ims) + cols - 1) // cols
+    sheet = Image.new("RGB", (cols * width, rows * (h + 22)), (0, 0, 0))
+    draw = ImageDraw.Draw(sheet)
+    font = ImageFont.truetype(FONT, 15) if os.path.exists(FONT) else None
+    for i, (im, lab) in enumerate(zip(ims, labels)):
+        x, y = (i % cols) * width, (i // cols) * (h + 22)
+        sheet.paste(im.resize((width, h)), (x, y + 22))
+        draw.text((x + 6, y + 3), lab, fill=(230, 230, 230), font=font)
+    sheet.save(out)
+
+
+def main(scene_id, video, times=None):
+    t0 = sc.SCENES[scene_id][0]
+    outdir = os.path.join("out", "keys", scene_id)
+    os.makedirs(outdir, exist_ok=True)
+    times = times or keyframe_times(scene_id)
+    paths, labels = [], []
+    for t in times:
+        p = os.path.join(outdir, f"{t:06.2f}.png")
+        extract(video, t - t0, p)
+        paths.append(p)
+        cap = [l.id for l in sc.lines_for(scene_id) if l.reveal <= t <= l.exit_end]
+        labels.append(f"t = {t:.2f} s  {' '.join(cap)}")
+    contact_sheet(paths, labels, os.path.join(outdir, "contact.png"))
+    print(os.path.join(outdir, "contact.png"), len(paths), "frames")
+
+
+if __name__ == "__main__":
+    extra = [float(x) for x in sys.argv[3:]] or None
+    main(sys.argv[1], sys.argv[2], extra)

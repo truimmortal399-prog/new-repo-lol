@@ -15,18 +15,25 @@ MIN_MOVE = 1.2
 
 @dataclass(frozen=True)
 class CamState:
+    """phi/theta in degrees; pivot = 3D rotation center (world); pan = screen offset of the
+    projected 3D content (frame units). See rubber_sheet/rig.py."""
+
     phi: float
     theta: float
     zoom: float = 1.0
-    frame_center: tuple = (0.0, 0.0, 0.0)
+    pivot: tuple = (0.0, 0.0, 0.0)
+    pan: tuple = (0.0, 0.0)
 
 
-TOP = CamState(phi=0.0, theta=-90.0)  # looks exactly like a 2D scene
-S3_TILTED = CamState(phi=58.0, theta=-90.0)
-S3_END = CamState(phi=58.0, theta=-50.0)
-CUT = CamState(phi=82.0, theta=0.0)  # looking along -sigma: the jw cut reads as a 2D profile
-ANALYSIS = CamState(phi=60.0, theta=-40.0, frame_center=(1.9, 0.0, 0.0))
-HERO = CamState(phi=62.0, theta=-60.0)
+SHEET_CENTER = (-1.25, 0.0, 0.0)  # middle of the s-plane domain (sigma -15..5 krad/s -> x)
+SHEET_PIVOT = (-1.25, 0.0, 1.6)  # middle of the sheet volume
+
+TOP = CamState(phi=0.0, theta=-90.0, zoom=0.80, pivot=SHEET_CENTER, pan=(0.9, 0.55))  # looks 2D
+S3_TILTED = CamState(phi=58.0, theta=-90.0, zoom=0.80, pivot=SHEET_PIVOT, pan=(0.7, 0.55))
+S3_END = CamState(phi=58.0, theta=-50.0, zoom=0.80, pivot=SHEET_PIVOT, pan=(0.7, 0.55))
+CUT = CamState(phi=82.0, theta=0.0, zoom=0.85, pivot=SHEET_PIVOT, pan=(-2.3, 0.6))  # jw cut reads as a 2D profile
+ANALYSIS = CamState(phi=60.0, theta=-40.0, zoom=0.74, pivot=SHEET_PIVOT, pan=(-2.5, 0.55))
+HERO = CamState(phi=62.0, theta=-60.0, zoom=0.85, pivot=SHEET_PIVOT, pan=(0.0, 0.5))
 
 
 @dataclass(frozen=True)
@@ -83,20 +90,6 @@ def trapezoid(run_time, ramp=RAMP):
         return vmax * (t - a / 2.0)
 
     return rate
-
-
-def move_kwargs(move):
-    """Keyword arguments for ThreeDScene.move_camera for a planned move."""
-    from manim import DEGREES
-
-    return dict(
-        phi=move.end.phi * DEGREES,
-        theta=move.end.theta * DEGREES,
-        zoom=move.end.zoom,
-        frame_center=list(move.end.frame_center),
-        run_time=move.run_time,
-        rate_func=trapezoid(move.run_time),
-    )
 
 
 def moves_in(scene):
