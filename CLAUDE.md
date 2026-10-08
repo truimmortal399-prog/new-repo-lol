@@ -83,8 +83,11 @@ Stop and report at each gate. Never start S1/S2/S4–S7 before Gates 2 and 3 are
 - Interpenetrating 3D primitives defeat the painter's order (staircase teeth): split them at the
   intersection (SigmaPlane: part under the sheet = UNDER_SHEET bias, part above sorts normally).
 - Inspect any moment at final mesh: `.venv/bin/python tools/still.py S4 25.6 [more times]` (RS_STILL_AT).
-- Every built scene is played by tests/test_scenes_monitor.py (overlap, strays, caption frames):
-  add new scenes there and to tools/keyframes.py SCENE_FILES.
+- Every built scene is played by tests/test_scenes_monitor.py (overlap, strays, caption frames)
+  and every cut between built scenes by tests/test_continuity.py: add new scenes to both and to
+  tools/keyframes.py SCENE_FILES. On real renders: `tools/check_continuity.py S4 S5 S6`.
+- Panels/readouts/labels fade only through their opacity trackers; a panel's design opacities are
+  recorded for every leaf (curves get their points later, in refresh).
 
 ## Quality bar
 No caption/visual overlap (automated), no caption shorter than its reading time (automated),

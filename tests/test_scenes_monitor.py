@@ -16,6 +16,7 @@ from manim import tempconfig
 
 from rubber_sheet import captions
 from rubber_sheet import script as sc
+from rubber_sheet import theme as th
 
 FPS = 5
 SCENES = [
@@ -33,7 +34,7 @@ def played(request, tmp_path_factory):
     mp.setenv("RS_NO_LOG", "1")  # never overwrite out/captions from a test
     media = tmp_path_factory.mktemp(f"media_{scene_id}")
     cfg = {"frame_rate": FPS, "pixel_width": 480, "pixel_height": 270, "dry_run": True, "disable_caching": True,
-           "media_dir": str(media), "progress_bar": "none", "verbosity": "ERROR"}
+           "media_dir": str(media), "progress_bar": "none", "verbosity": "ERROR", "background_color": th.BG}
     try:
         with tempconfig(cfg):
             scene = getattr(importlib.import_module(f"scenes.{module}"), cls)()

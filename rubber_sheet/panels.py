@@ -64,8 +64,11 @@ class Panel(VGroup):
 
     def freeze_design_opacities(self):
         """Record every static leaf's design opacities (end of a subclass __init__)."""
+        # every leaf, including curves that get their points only in refresh() (filtering on
+        # has_points() left the impulse curve and envelope out: drawn at full opacity while the
+        # panel was still invisible, caught at the S5|S6 cut by tools/check_continuity.py)
         skip = {m for root in self.dynamic() for m in root.get_family()}
-        self._static = [(m, m.get_fill_opacity(), m.get_stroke_opacity()) for m in self.get_family() if m.has_points() and m not in skip]
+        self._static = [(m, m.get_fill_opacity(), m.get_stroke_opacity()) for m in self.get_family() if not m.submobjects and m not in skip]
 
     def apply_opacity(self):
         op = self.opacity.get_value()

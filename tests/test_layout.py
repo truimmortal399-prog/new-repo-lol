@@ -111,3 +111,17 @@ def test_left_aligned_readout_has_no_gap_and_moves_only_on_digit_count_change():
         assert 0.0 < gap() < 0.2 and abs(r.label.get_left()[0] - label_x) < 1e-9
         dots.setdefault(len(f"{val:.1f}"), set()).add(round(dot_x(), 9))
     assert all(len(xs) == 1 for xs in dots.values())  # fixed within each digit count
+
+
+@pytest.mark.parametrize("which", ["bode", "impulse"])
+def test_panel_opacity_tracker_reaches_every_drawn_leaf(which):
+    """A panel at opacity 0 draws nothing (incl. curves that get points only in refresh)."""
+    panel = (BodePanel(lambda w: ph.mag_C(1j * w, 4.0), th.BODE_BOX, warp=ValueTracker(1.0)) if which == "bode"
+             else ImpulsePanel(lambda: 4.0, th.IMPULSE_BOX))
+    panel.opacity.set_value(0.0)
+    panel.update()
+    drawn = [m for m in panel.get_family() if m.has_points() and (m.get_fill_opacity() > 0 or (m.get_stroke_width() > 0 and m.get_stroke_opacity() > 0))]
+    assert not drawn, [type(m).__name__ for m in drawn]
+    panel.opacity.set_value(1.0)
+    panel.update()
+    assert panel.curve.get_stroke_opacity() == pytest.approx(1.0)
