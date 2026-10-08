@@ -102,23 +102,35 @@ Emphasis colors: points/poles/tent pole/Poles/Infinite → POLE; zero/nails → 
 rings/frequency response/Bode plot/peak/ringing/never stops/longer the ring/jω → SIGNAL.
 Film end 76.0 s. Dropping C8 + log warp: C7 holds to 33.0, S4 shortens ≈ 2.8 s → ≈ 73.2 s.
 
+### Scene cuts (rubber_sheet/script.py `SCENES`; no caption crosses a cut — tested)
+S1 0.00–6.62 · S2 6.62–11.60 · S3 11.60–25.00 · S4 25.00–35.72 · S5 35.72–48.31 · S6 48.31–61.00 ·
+S7 61.00–76.00.
+
+### Camera moves (rubber_sheet/camera.py `MOVES`; peaks derived from start/end states — tested)
+| Move | Time | From → to (φ, θ) | Peak √(φ'²+θ'²) |
+|---|---|---|---|
+| S3 tilt | 15.60–20.60 | (0, −90) → (58, −90) | 13.81°/s |
+| S3 θ swing | 21.00–24.60 | (58, −90) → (58, −50) | 14.29°/s |
+| S4 swing to CUT | 25.40–30.20 | (58, −50) → (82, 0) | 13.87°/s |
+| S5 return to ANALYSIS | 35.72–39.92 | (82, 0) → (60, −40) | 13.43°/s |
+
 ### Visual timeline
-- **S1 0.0–6.6 Hook + title.** Sheet, poles punching up, gold jω glow, HERO orbit 3°/s; title
-  fades in upper third over the hook (no separate card); 0.3 s dip to BG.
-- **S2 6.6–11.6 Circuit.** `Create` schematic (6.7–9.2) simultaneously with `Write(H(s))`
+- **S1 0.00–6.62 Hook + title.** Sheet, poles punching up, gold jω glow, HERO orbit 3°/s; title
+  fades in upper third over the hook (no separate card); 0.3 s dip to BG at the end.
+- **S2 6.62–11.6 Circuit.** `Create` schematic (6.7–9.2) simultaneously with `Write(H(s))`
   (7.4–9.4); values R = 120 Ω, L = 10 mH, C = 1 µF; v_out bracket on C; H(s) to top-left (10.4–11.4).
 - **S3 11.6–25.0 Poles → sheet.** Top-down s-plane; denominator = 0 → roots fly to × at −6 ± j8
-  (11.8–13.4), dashed |s| = 10 circle. Tilt φ 0→58° (θ fixed) 15.6–20.6 (peak 13.8°/s). Lift
+  (11.8–13.4), dashed |s| = 10 circle. Tilt φ 0→58° (θ fixed) 15.6–20.6. Lift
   18.0–20.5; tag `height = 20 log₁₀|H|` (dB) appears at 18.0 and persists, plus floor tag
-  "floor: −40 dB (clipped)". θ −90→−50° 21.0–24.6 (peak 14.3°/s). "pole" labels on tent poles 21.2.
-- **S4 25.0–35.2 Slice → Bode.** Gold σ = 0 plane 25.3; σ > 0 half lowers/fades 26.0–27.5; swing
-  to CUT 25.4–30.2 (peak 13.2°/s); 3D→fixed handoff 30.3; fly to panel 30.4–31.8; log warp
-  33.2–35.2 (droppable).
-- **S5 35.2–47.9 Zero.** Camera return to ANALYSIS + sheet restore 35.2–39.4 (peak 13.4°/s).
+  "floor: −40 dB (clipped)". θ −90→−50° 21.0–24.6. "pole" labels on tent poles 21.2.
+- **S4 25.0–35.72 Slice → Bode.** Gold σ = 0 plane 25.3; σ > 0 half lowers/fades 26.0–27.5; swing
+  to CUT 25.4–30.2; 3D→fixed handoff 30.3; fly to panel 30.4–31.8; log warp 33.2–35.2
+  (droppable); hold to 35.72.
+- **S5 35.72–48.31 Zero.** Camera return to ANALYSIS + sheet restore 35.72–39.92.
   Probe C→R + formula H_R 36.2–37.2. Disclosure tag 37.2–46.8. Zero: −∞→−15 krad/s 37.4–38.0
   (b = −1/z linear; teal edge arrow), −15→0 38.0–41.0 (linear), hold 41.0–43.6, 0→−15 43.6–46.2,
   −15→−∞ 46.2–46.8. Probe R→C + formula H_C 45.6–46.6.
-- **S6 47.9–61.0 Sweep.** Impulse panel joins 48.0–49.2; sweep 49.5–61.0, R = 120 → 4 Ω (log);
+- **S6 48.31–61.0 Sweep.** Impulse panel joins 48.31–49.5; sweep 49.5–61.0, R = 120 → 4 Ω (log);
   poles glide on |s| = ω₀; Bode peak + readouts; h(t) + coral envelope; slow θ drift 8°.
 - **S7 61.0–76.0 Limit + payoff.** R 4 → 0 61.3–64.3 with push-in 61.5–64.8; ∞ marker; sustained
   ringing. Pull back 68.2–70.8; R eases to 40 Ω; C17; clean final frame 74.2–75.6; fade 75.6–76.0.
@@ -161,9 +173,11 @@ Film end 76.0 s. Dropping C8 + log warp: C7 holds to 33.0, S4 shortens ≈ 2.8 s
 | Container recycled | Commit/push often; background renders with cached partials |
 
 ## 10. Verification
-1. pytest: physics vs scipy (poles sorted by (imag, real); R = 0 compares |p| and |Re p| < 1e-9·ω₀;
-   freqresp; impulse; polyval; zmap; H_z family), panel-data inversion, caption rule
-   (n recomputed from text, holds, sequencing, ≤ 78 s), camera peak speed.
+1. `pytest tests/` (pytest.ini sets pythonpath): physics vs scipy (poles sorted by (imag, real);
+   R = 0 compares |p| and |Re p| < 1e-9·ω₀; freqresp; impulse atol 1e-6; polyval; zmap; H_z family),
+   panel-data inversion, caption rule (n recomputed from text, holds, sequencing, no caption
+   crosses a scene cut, ≤ 78 s), camera (state continuity, peak speed from start/end states,
+   600-sample numeric check, ≤ 15°/s).
 2. Preview renders + `check_captions.py` (overlap, hold vs log within ±1 frame).
 3. `keyframes.py`: PNGs at each caption mid-hold, beat boundaries, sweep u ∈ {0, 0.5, 1}; contact
    sheet; every frame inspected. Repeat at 1080p for legibility.
@@ -183,7 +197,8 @@ wall; 4K ≈ 2–6 h wall. 1080p committed if < 100 MB; 4K as a GitHub Release a
 session's tools can create releases — checked at Gate 3).
 
 ## 12. Gates
-1. Install, LaTeX + font smoke test, test_physics.py. (done)
+1. Install, LaTeX + font smoke test, test_physics.py. (done; pre-Gate-2 fixes: scene cuts moved
+   so no caption crosses one, pytest.ini, state-derived camera test, impulse atol 1e-6)
 2. LiveSurface, captions, theme, S3 at preview + keyframes; fixed-in-frame probe; bench_live.py.
 3. 2 s timing of bench_live.py at 4K60 and 1080p60 → full estimate, 4K go/no-go.
 Remaining scenes only after Gates 2 and 3 are approved.

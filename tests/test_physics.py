@@ -56,8 +56,7 @@ def test_bode_magnitude_matches_freqresp(R):
 def test_impulse_matches_scipy(R):
     t = np.linspace(0.0, 8e-3, 4001)
     _, h_ref = signal.impulse(tf_C(R), T=t)
-    err = np.max(np.abs(ph.impulse_response(t, R) - h_ref))
-    assert err < 1e-6 * ph.OMEGA0, err
+    np.testing.assert_allclose(ph.impulse_response(t, R), h_ref, rtol=0, atol=1e-6)
 
 
 def test_impulse_at_R_zero_never_decays():
