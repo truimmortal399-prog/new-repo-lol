@@ -116,3 +116,9 @@ def test_probe_swap_changes_only_the_subscript():
     a, b = common.probe_label("C"), common.probe_label("R")
     assert len(a) == len(b)
     np.testing.assert_allclose([m.get_center() for m in a[:-1]], [m.get_center() for m in b[:-1]], atol=0.01)
+
+
+def test_s5_labels_at_the_edge_never_share_the_screen():
+    """'from -inf', 'zero' and 'to -inf' sit at almost the same spot: their fades never overlap."""
+    assert bt.S5_EDGE_LABEL_OUT[1] <= bt.S5_ZERO_LABEL_IN[0]
+    assert bt.S5_ZERO_LABEL_OUT[1] <= bt.S5_EDGE_LABEL_BACK[0]

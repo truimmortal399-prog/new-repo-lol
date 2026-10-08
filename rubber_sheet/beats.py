@@ -29,12 +29,12 @@ S5_RIGHT_RESTORE = (36.00, 37.50)
 S5_PROBE_TO_R = (36.20, 36.80)  # v_C -> v_R and numerator 1 -> RCs (CLAUDE.md: R during 36.2-46.6)
 S5_EDGE_LABEL_IN = (37.20, 37.50)  # 'from -inf' at the domain edge while the zero approaches
 S5_ZERO_SHOW = (37.85, 38.15)  # nail + floor ring appear as the zero reaches the edge (38.0)
-S5_EDGE_LABEL_OUT = (38.10, 38.40)
-S5_ZERO_LABEL_IN = (38.30, 38.80)  # 'zero' rides on the nail head
+S5_EDGE_LABEL_OUT = (38.00, 38.25)
+S5_ZERO_LABEL_IN = (38.35, 38.85)  # 'zero' rides on the nail head (never with 'from -inf')
 S5_SIGMA_LABEL_IN = (39.30, 39.90)  # the sigma billboard returns with the ANALYSIS view
 S5_PROBE_TO_C = (45.60, 46.20)
-S5_ZERO_LABEL_OUT = (45.80, 46.10)
-S5_EDGE_LABEL_BACK = (46.00, 46.30)  # 'to -inf' while the zero leaves the domain
+S5_ZERO_LABEL_OUT = (45.75, 46.05)
+S5_EDGE_LABEL_BACK = (46.15, 46.45)  # 'to -inf' while the zero leaves the domain
 S5_ZERO_HIDE = (46.05, 46.35)
 S5_EDGE_LABEL_GONE = (46.90, 47.20)
 # Zero beat parameter u (physics.zero_slide): 0 = no zero (H_C), 1 = zero at the domain edge,

@@ -105,11 +105,15 @@ class Timeline:
         # RS_STILL_AT=<film time> (tools/still.py): run every frame up to that time but draw only the
         # last one, so the movie holds exactly that frame. (manim -s cannot do this: it skips to
         # the end of the play and finishes every clip.)
-        still = os.environ.get("RS_STILL_AT")
-        if still is None:
+        # RS_SPAN=<t0>:<t1> (film times): the same, drawing only the frames in [t0, t1] (exact
+        # per-frame timing of a slice of real content, tools/time_scenes.py).
+        still, span = os.environ.get("RS_STILL_AT"), os.environ.get("RS_SPAN")
+        if still is None and span is None:
             scene.play(self.build())
             return
-        local = round((float(still) - self.t0) * self.fps) / self.fps
+        a, b = (float(still), float(still)) if still is not None else (float(x) for x in span.split(":"))
+        lo, hi = (round((t - self.t0) * self.fps) / self.fps for t in (a, b))
         draw = scene.renderer.render
-        scene.renderer.render = lambda sc, t, moving: draw(sc, t, moving) if t >= local - 0.25 / self.fps else None
-        scene.play(self.build(local + 0.5 / self.fps))
+        eps = 0.25 / self.fps
+        scene.renderer.render = lambda sc, t, moving: draw(sc, t, moving) if lo - eps <= t <= hi + eps else None
+        scene.play(self.build(hi + 0.5 / self.fps))

@@ -65,3 +65,14 @@ def test_group_clock_is_scene_time_when_a_clip_ends_past_the_last_frame():
         group = tl.build()  # max_end_time is set at construction
         for t in (0.0, 4.4, 7.0, tl.duration):
             assert group.rate_func(t / tl.duration) * group.max_end_time == pytest.approx(t, abs=1e-12)
+
+
+@pytest.mark.parametrize("fps", [15, 30, 60])
+def test_expected_caption_frames_stay_inside_their_scene(fps):
+    from rubber_sheet import captions
+
+    for line in sc.LINES:
+        first, last = captions.expected_visible(line, line.scene, fps)
+        t0 = sc.scene_start_on_grid(line.scene, fps)
+        _, n = sc.scene_frames(line.scene, fps)
+        assert t0 <= first <= last <= t0 + (n - 1) / fps + 1e-9, (line.id, fps)

@@ -308,12 +308,14 @@ class CaptionTrack:
         for m in mobs:
             self.world_flat.update(m.get_family())
 
-    def protect(self, name, mob, fixed, annotation=False):
+    def protect(self, name, mob, fixed, annotation=False, label=True):
         """Register a key visual that must never enter the caption band or a caption's box.
 
         Fixed (HUD) visuals are also kept clear of projected 3D visuals, except annotations:
-        labels that deliberately sit next to the 3D geometry they name."""
-        self.protected.append((name, mob, fixed, annotation))
+        labels that deliberately sit next to the 3D geometry they name. Annotation labels must
+        not cover each other or an overlay; label=False exempts an annotation that is not a label
+        (S4's handoff curve, which lands in the Bode panel on purpose)."""
+        self.protected.append((name, mob, fixed, annotation and (label or "free")))
 
     # --- per-frame monitoring ---------------------------------------------------------------
     def monitor(self):
@@ -337,7 +339,7 @@ class CaptionTrack:
             band = (th.CAPTION_BAND["x0"], th.CAPTION_BAND["y0"], th.CAPTION_BAND["x1"], th.CAPTION_BAND["y1"])
             boxes = [("band", band)] + [(cid, _bbox_fixed(c.words)) for cid, c in visible.items() if c.line.region != "band"]
             t = round(t_local + self.t0, 3)
-            hud, world_pts = [], []
+            hud, world_pts, notes = [], [], []
             for name, mob, fixed, annotation in self.protected:
                 m = mob() if callable(mob) else mob
                 if m is None or not any(f in in_scene for f in m.get_family()):
@@ -346,7 +348,9 @@ class CaptionTrack:
                     continue
                 if fixed:
                     box = _bbox(_leaf_points(m, visible_only=True))
-                    if not annotation:
+                    if annotation is True:
+                        notes.append((name, box))
+                    elif not annotation:
                         hud.append((name, box))
                 else:
                     pts = _projected_points(self.scene.camera, m, visible_only=True)
@@ -355,6 +359,11 @@ class CaptionTrack:
                 for other, obox in boxes:
                     if _intersects(box, obox):
                         self.violations.append(dict(t=t, visual=name, with_=other))
+            # annotation labels (pole/zero/axis labels) must not cover each other, nor any overlay
+            for i, (n1, b1) in enumerate(notes):
+                for n2, b2 in notes[i + 1 :] + hud:
+                    if _intersects(b1, b2):
+                        self.violations.append(dict(t=t, visual=n1, with_=n2))
             # 3D visuals must not run into fixed overlays (formula, tags, panels): any projected
             # outline point inside an overlay's box is a collision.
             for name, pts in world_pts:
@@ -424,7 +433,10 @@ def expected_visible(line, scene_id, fps):
     reveal, exit_end = line.reveal + shift, line.exit_end + shift
     first = t0 + (math.floor((reveal - t0) * fps + 1e-6) + 1) / fps
     last = t0 + (math.ceil((exit_end - t0) * fps - 1e-6) - 1) / fps
-    return first, last
+    # an exit ending exactly on the cut may own a grid frame that belongs to the next scene (S4's
+    # C8 at 60 fps: 35.7167 < 35.72, ~3 % opacity): the scene's own last frame is the limit
+    _, n = sc.scene_frames(scene_id, fps)
+    return first, min(last, t0 + (n - 1) / fps)
 
 
 def timing_problems(line, scene_id, fps, first_visible, last_visible):

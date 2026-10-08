@@ -113,7 +113,7 @@ class S4SliceBode(ThreeDScene):
         track.protect("tent poles", sheet.tents, False)
         track.protect("pole labels", pole_labels, True, annotation=True)
         track.protect("jw label", jw_label, True, annotation=True)
-        track.protect("handoff curve", flyer, True, annotation=True)  # flies over the scene on purpose
+        track.protect("handoff curve", flyer, True, annotation=True, label=False)  # flies over the scene into the panel
         self.add_updater(track.monitor())
 
         # --- timeline (film times) ----------------------------------------------------------------
